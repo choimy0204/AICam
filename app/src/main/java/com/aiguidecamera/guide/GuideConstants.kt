@@ -7,14 +7,22 @@ package com.aiguidecamera.guide
 object GuideConstants {
 
     // ── 인물: 구도 (화면 높이·너비 대비 비율) ─────────────────────────────
+    /** 전신 정수리 위 최소 여백. 최대는 두지 않는다 (전신은 위를 넉넉히 두는 게 정석). */
     const val HEADROOM_MIN = 0.05f
-    const val HEADROOM_MAX = 0.15f
+    /** 발 아래 여백은 발목 기준이다. 발바닥은 발목보다 약 0.03~0.04 아래라 SPEC 값(0.02~0.08)보다 넉넉히 잡는다. */
     const val FOOT_MARGIN_MIN = 0.02f
-    const val FOOT_MARGIN_MAX = 0.08f
+    const val FOOT_MARGIN_MAX = 0.12f
     const val JOINT_EDGE_TOLERANCE = 0.03f
     const val FULL_BODY_HEIGHT_MIN = 0.60f
     const val FULL_BODY_HEIGHT_MAX = 0.85f
     const val SUBJECT_CENTER_TOLERANCE = 0.05f
+
+    /** 상반신·클로즈업에서 눈의 목표 높이 (위쪽 3분할선)와 허용 오차. */
+    const val EYE_LINE_TARGET = 1f / 3f
+    const val EYE_LINE_TOLERANCE = 0.06f
+
+    /** 눈 관절이 없을 때 얼굴 박스 위에서 눈까지의 거리 (얼굴 박스 높이 대비). */
+    const val EYES_BELOW_FACE_TOP_RATIO = 0.4f
     const val HORIZON_TOLERANCE_DEG = 2.0f
     const val CAMERA_DOWNWARD_PITCH_MAX_DEG = 10.0f
     const val BACKLIGHT_RATIO_MIN = 0.6f

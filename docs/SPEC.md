@@ -77,6 +77,8 @@ HintType: 화살표 방향(UP/DOWN/BACK/ROTATE_LEFT/ROTATE_RIGHT) 또는 NONE
 1. CameraHeightRule — 폰이 너무 높아 내려다보는 각도(피치 기준 + 머리/발목 화면 비율 휴리스틱) → "폰을 허리 높이로 내려주세요 ↓"
 2. BodyCropRule — 무릎이 보이는데 발목이 없거나 화면 하단 경계에 걸림, 또는 관절 부위에서 잘림 → "발끝이 잘렸어요. 조금 뒤로 물러나 주세요"
 3. HeadroomRule — 머리 위 여백이 너무 좁거나 너무 넓음 → 방향 조언 (임계값은 10절 GuideConstants 기준)
+   (v1.0.4 변경) 전신만 "빠듯함"을 본다. 여백이 넓은 쪽은 보지 않는다. 0번 SubjectPresenceRule(사람 없음·너무 작음)이 맨 앞에 있고,
+   FootMarginRule(전신 발 아래 여백), EyeLineRule(상반신·클로즈업 눈을 위쪽 3분할선에), SubjectPlacementRule(가로 위치: 가운데·3분할선)이 추가됐다. 근거는 DECISIONS.md "인물 구도 사전조사".
 4. BacklightRule — 얼굴 밝기 / 전체 밝기 < 0.6 → "역광이에요. 빛을 등지지 않게 위치를 바꿔주세요"
 5. HorizonRule — |롤| > 2° → "폰이 살짝 기울었어요" + 수평선 표시
 

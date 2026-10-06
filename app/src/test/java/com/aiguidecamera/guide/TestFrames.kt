@@ -38,7 +38,7 @@ object TestFrames {
         poseMotion = motion,
     )
 
-    /** 구도가 잘 맞은 전신: 정수리 여백 약 0.13, 발 아래 여백 0.14, 관절이 모두 화면 안쪽. */
+    /** 구도가 잘 맞은 전신: 정수리 여백 약 0.13, 발목 아래 여백 0.10, 관절이 모두 화면 안쪽. */
     fun goodFullBody(): MutableMap<BodyPart, Landmark> = mutableMapOf(
         BodyPart.NOSE to visible(0.50f, 0.18f),
         BodyPart.LEFT_EYE to visible(0.48f, 0.17f),
@@ -49,10 +49,10 @@ object TestFrames {
         BodyPart.RIGHT_ELBOW to visible(0.62f, 0.38f),
         BodyPart.LEFT_HIP to visible(0.45f, 0.50f),
         BodyPart.RIGHT_HIP to visible(0.55f, 0.50f),
-        BodyPart.LEFT_KNEE to visible(0.45f, 0.68f),
-        BodyPart.RIGHT_KNEE to visible(0.55f, 0.68f),
-        BodyPart.LEFT_ANKLE to visible(0.45f, 0.86f),
-        BodyPart.RIGHT_ANKLE to visible(0.55f, 0.86f),
+        BodyPart.LEFT_KNEE to visible(0.45f, 0.70f),
+        BodyPart.RIGHT_KNEE to visible(0.55f, 0.70f),
+        BodyPart.LEFT_ANKLE to visible(0.45f, 0.90f),
+        BodyPart.RIGHT_ANKLE to visible(0.55f, 0.90f),
     )
 
     /** 엉덩이 위까지만 보이는 상반신. */

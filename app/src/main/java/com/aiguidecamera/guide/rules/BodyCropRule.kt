@@ -47,6 +47,7 @@ class BodyCropRule : Rule {
             BodyPart.LEFT_KNEE, BodyPart.RIGHT_KNEE,
             BodyPart.LEFT_ANKLE, BodyPart.RIGHT_ANKLE,
             BodyPart.LEFT_ELBOW, BodyPart.RIGHT_ELBOW,
+            BodyPart.LEFT_HIP, BodyPart.RIGHT_HIP,
         )
     }
 }

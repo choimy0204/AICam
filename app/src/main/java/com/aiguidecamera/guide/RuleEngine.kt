@@ -5,11 +5,14 @@ import com.aiguidecamera.guide.rules.BacklightRule
 import com.aiguidecamera.guide.rules.BodyCropRule
 import com.aiguidecamera.guide.rules.CameraHeightRule
 import com.aiguidecamera.guide.rules.ColorCastRule
+import com.aiguidecamera.guide.rules.EyeLineRule
+import com.aiguidecamera.guide.rules.FootMarginRule
 import com.aiguidecamera.guide.rules.FoodAngleRule
 import com.aiguidecamera.guide.rules.HeadroomRule
 import com.aiguidecamera.guide.rules.HorizonRule
 import com.aiguidecamera.guide.rules.Issue
 import com.aiguidecamera.guide.rules.Rule
+import com.aiguidecamera.guide.rules.SubjectPlacementRule
 import com.aiguidecamera.guide.rules.SubjectPresenceRule
 
 /**
@@ -23,8 +26,11 @@ class RuleEngine {
         CameraHeightRule(),
         BodyCropRule(),
         HeadroomRule(),
+        FootMarginRule(),
+        EyeLineRule(),
         BacklightRule(),
         HorizonRule(priority = 5),
+        SubjectPlacementRule(),
     )
 
     private val foodRules: Map<FoodAngle, List<Rule>> = FoodAngle.entries.associateWith { angle ->

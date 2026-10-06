@@ -9,22 +9,19 @@ import com.aiguidecamera.guide.meanVisibleY
 import com.aiguidecamera.guide.visible
 
 /**
- * 정수리 위 여백(화면 높이 대비)이 기준 범위 안인지 본다. 정수리는 얼굴 박스, 없으면 코·어깨 위치로 추정한다.
+ * 전신에서 머리 위가 빠듯하지 않은지 본다. 정수리는 얼굴 박스, 없으면 코·어깨 위치로 추정한다.
+ * 여백이 넓은 쪽은 보지 않는다: 전신은 발끝을 아래에 붙이고 위를 넉넉히 두는 게 정석이다 (FootMarginRule이 맡음).
+ * 전신이 아닌 인물은 EyeLineRule이 맡는다.
  */
 class HeadroomRule : Rule {
     override val id = ID
     override val priority = 3
 
     override fun check(result: FrameAnalysisResult): Issue? {
-        if (ShotClassifier.classify(result.landmarks) == ShotType.NONE && result.primaryFace == null) return null
+        if (ShotClassifier.classify(result.landmarks) != ShotType.FULL_BODY) return null
         val headroom = estimateHeadTopY(result) ?: return null
-        return when {
-            headroom < GuideConstants.HEADROOM_MIN ->
-                Issue(id, priority, "머리 위가 빠듯해요. 폰을 살짝 위로 기울여 주세요", HintType.UP)
-            headroom > GuideConstants.HEADROOM_MAX ->
-                Issue(id, priority, "머리 위 여백이 넓어요. 폰을 살짝 아래로 기울여 주세요", HintType.DOWN)
-            else -> null
-        }
+        if (headroom >= GuideConstants.HEADROOM_MIN) return null
+        return Issue(id, priority, "머리 위가 빠듯해요. 폰을 살짝 위로 기울여 주세요", HintType.UP)
     }
 
     /** 화면 위쪽 끝(0)부터 정수리까지의 거리 = 머리 위 여백. 음수면 머리가 잘린 것. */

@@ -58,4 +58,12 @@ class BodyCropRuleTest {
         val issue = rule.check(frame(landmarks = landmarks))
         assertTrue(issue!!.message.contains("관절"))
     }
+
+    @Test
+    fun `상반신이 엉덩이에서 잘리면 관절 잘림`() {
+        val landmarks = TestFrames.upperBodyOnly().apply {
+            put(BodyPart.LEFT_HIP, TestFrames.visible(0.45f, 0.99f))
+        }
+        assertTrue(rule.check(frame(landmarks = landmarks))!!.message.contains("관절"))
+    }
 }
