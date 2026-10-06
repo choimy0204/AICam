@@ -15,18 +15,18 @@ android {
         applicationId = "com.aiguidecamera"
         minSdk = 26
         targetSdk = 36
-        // 배포할 때마다 둘 다 올린다. 앱은 versionName을 GitHub 릴리스 태그(v1.0 등)와 비교한다.
-        versionCode = 2
-        versionName = "1.0.1"
+        // 諛고룷???뚮쭏???????щ┛?? ?깆? versionName??GitHub 由대━???쒓렇(v1.0 ??? 鍮꾧탳?쒕떎.
+        versionCode = 3
+        versionName = "1.0.2"
 
-        // 실제 폰은 거의 모두 64비트 ARM. 다른 CPU용 ML Kit 네이티브 라이브러리를 빼서 APK를 줄인다.
+        // ?ㅼ젣 ?곗? 嫄곗쓽 紐⑤몢 64鍮꾪듃 ARM. ?ㅻⅨ CPU??ML Kit ?ㅼ씠?곕툕 ?쇱씠釉뚮윭由щ? 鍮쇱꽌 APK瑜?以꾩씤??
         ndk {
             abiFilters += "arm64-v8a"
         }
     }
 
-    // 배포용 서명 키는 저장소에 올리지 않는다 (keystore.properties, keystore/ 는 .gitignore).
-    // 업데이트 설치는 같은 키로 서명된 APK끼리만 되므로 키를 잃어버리지 않게 따로 백업한다.
+    // 諛고룷???쒕챸 ?ㅻ뒗 ??μ냼???щ━吏 ?딅뒗??(keystore.properties, keystore/ ??.gitignore).
+    // ?낅뜲?댄듃 ?ㅼ튂??媛숈? ?ㅻ줈 ?쒕챸??APK?쇰━留??섎?濡??ㅻ? ?껋뼱踰꾨━吏 ?딄쾶 ?곕줈 諛깆뾽?쒕떎.
     val keystorePropertiesFile = rootProject.file("keystore.properties")
     val releaseSigning = if (keystorePropertiesFile.exists()) {
         val properties = Properties().apply { keystorePropertiesFile.inputStream().use(::load) }

@@ -42,6 +42,7 @@ class GLRenderer(
     private var bufferWidth = 0
     private var bufferHeight = 0
     private var rotationDegrees = 0
+    private var cameraTransformInTexture = false
     private var mirrorHorizontally = false
 
     /** GL 컨텍스트가 다시 만들어져도 복원할 수 있도록 마지막 값을 기억한다. */
@@ -99,14 +100,17 @@ class GLRenderer(
 
     /**
      * 카메라 버퍼 크기(센서 방향 기준)와 똑바로 세우기 위한 시계방향 회전각을 알려준다.
-     * 전면 카메라는 [mirror]=true로 좌우 반전한다.
+     * 전면 카메라는 [mirror]=true(프리뷰가 거울상).
+     * [transformInTexture]면 카메라가 센서 회전·거울 반전을 SurfaceTexture 변환 행렬에 이미 넣어 두었으므로
+     * 정점 행렬에서는 다시 돌리거나 뒤집지 않는다(두 번 적용하면 프리뷰가 옆으로 눕는다).
      */
-    fun setPreviewGeometry(width: Int, height: Int, rotation: Int, mirror: Boolean) {
+    fun setPreviewGeometry(width: Int, height: Int, rotation: Int, mirror: Boolean, transformInTexture: Boolean) {
         glView.queueEvent {
             bufferWidth = width
             bufferHeight = height
             rotationDegrees = rotation
             mirrorHorizontally = mirror
+            cameraTransformInTexture = transformInTexture
             updateMvpMatrix()
         }
     }
@@ -149,12 +153,15 @@ class GLRenderer(
         } else {
             scaleY = viewAspect / contentAspect
         }
+        // 화면→사진 좌표 변환은 프리뷰가 실제로 거울상인지만 보면 된다 (누가 뒤집었는지와 무관).
         setImageTransform(visibleX = 1f / scaleX, visibleY = 1f / scaleY, mirror = mirrorHorizontally)
-        if (mirrorHorizontally) scaleX = -scaleX
+        // 카메라가 이미 돌리고 뒤집어 둔 경우: 화면이 세로 고정이고 폰의 기본 방향이 세로라 남은 회전은 0.
+        val vertexRotation = if (cameraTransformInTexture) 0 else rotationDegrees
+        if (mirrorHorizontally && !cameraTransformInTexture) scaleX = -scaleX
 
         // 최종 = Scale * Rotate. setRotateM은 반시계 방향이 양수이므로 시계방향 회전은 음수로 준다.
         Matrix.scaleM(mvpMatrix, 0, scaleX, scaleY, 1f)
-        Matrix.rotateM(mvpMatrix, 0, -rotationDegrees.toFloat(), 0f, 0f, 1f)
+        Matrix.rotateM(mvpMatrix, 0, -vertexRotation.toFloat(), 0f, 0f, 1f)
     }
 
     /**

@@ -76,8 +76,8 @@ class CameraController(context: Context) {
     /** 메인 스레드에서만 접근. 지금 GL 렌더러가 그리고 있는 SurfaceTexture. */
     private var currentSurfaceTexture: SurfaceTexture? = null
 
-    /** 프리뷰 버퍼 크기·회전이 정해지면 호출된다 (width, height, rotationDegrees, mirror). */
-    var previewGeometryListener: ((Int, Int, Int, Boolean) -> Unit)? = null
+    /** 프리뷰 버퍼 크기·회전이 정해지면 호출된다 (width, height, rotationDegrees, mirror, 카메라 변환이 텍스처 행렬에 포함됐는지). */
+    var previewGeometryListener: ((Int, Int, Int, Boolean, Boolean) -> Unit)? = null
 
     /** 카메라를 열지 못하면(없음·다른 앱이 사용 중 등) 예외를 던진다. */
     suspend fun bind(lifecycleOwner: LifecycleOwner, useFrontCamera: Boolean) {
@@ -168,7 +168,9 @@ class CameraController(context: Context) {
         val isFrontCamera = lensFacing == CameraSelector.LENS_FACING_FRONT
 
         request.setTransformationInfoListener(mainExecutor) { info ->
-            previewGeometryListener?.invoke(resolution.width, resolution.height, info.rotationDegrees, isFrontCamera)
+            previewGeometryListener?.invoke(
+                resolution.width, resolution.height, info.rotationDegrees, isFrontCamera, info.hasCameraTransform(),
+            )
         }
         request.provideSurface(surface, mainExecutor) {
             surface.release()
