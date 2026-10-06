@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -20,14 +21,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aiguidecamera.AIGuideCameraApp
+import com.aiguidecamera.update.UpdateState
 
-/** 설정 화면: "원본도 함께 저장" 스위치와 앱 버전. */
+/** 설정 화면: "원본도 함께 저장" 스위치, 앱 버전과 업데이트 확인. */
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val settings = (context.applicationContext as AIGuideCameraApp).settings
     val saveOriginalToo by settings.saveOriginalToo.collectAsStateWithLifecycle()
     val versionName = remember { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }
+    val updateManager = (context.applicationContext as AIGuideCameraApp).updateManager
+    val updateState by updateManager.state.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier
@@ -42,13 +46,34 @@ fun SettingsScreen(onBack: () -> Unit) {
             checked = saveOriginalToo,
             onCheckedChange = settings::setSaveOriginalToo,
         )
-        Text(
-            text = "버전 $versionName",
-            color = Color.Gray,
-            fontSize = 13.sp,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp),
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                Text(text = "버전 $versionName", color = Color.White, fontSize = 16.sp)
+                updateStatusText(updateState)?.let { status ->
+                    Text(text = status, color = Color.LightGray, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
+                }
+            }
+            TextButton(
+                onClick = { updateManager.checkForUpdate(silent = false) },
+                enabled = updateState != UpdateState.Checking,
+            ) {
+                Text("업데이트 확인")
+            }
+        }
     }
+}
+
+/** 확인 결과만 여기서 보여준다. 새 버전이 있으면 대화상자(UpdateDialog)가 뜬다. */
+private fun updateStatusText(state: UpdateState): String? = when (state) {
+    UpdateState.Checking -> "확인 중…"
+    UpdateState.UpToDate -> "최신 버전이에요"
+    UpdateState.CheckFailed -> "확인하지 못했어요. 인터넷 연결을 확인해 주세요"
+    else -> null
 }
 
 @Composable

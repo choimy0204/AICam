@@ -9,8 +9,9 @@ import com.aiguidecamera.storage.AppDatabase
 import com.aiguidecamera.storage.AppSettings
 import com.aiguidecamera.storage.PhotoLoader
 import com.aiguidecamera.storage.PhotoSaver
+import com.aiguidecamera.update.UpdateManager
 
-/** 앱 전역에서 하나씩만 필요한 객체(DB, 저장기, LUT 로더, 오프스크린 렌더러 등)를 들고 있는 Application. */
+/** 앱 전역에서 하나씩만 필요한 객체(DB, 저장기, LUT 로더, 오프스크린 렌더러, 업데이트 관리자 등)를 들고 있는 Application. */
 class AIGuideCameraApp : Application() {
 
     val database: AppDatabase by lazy { AppDatabase.get(this) }
@@ -30,4 +31,8 @@ class AIGuideCameraApp : Application() {
     val stillFaceDetector: StillFaceDetector by lazy { StillFaceDetector() }
 
     val filterPreferences: FilterPreferences by lazy { FilterPreferences(this) }
+
+    val updateManager: UpdateManager by lazy {
+        UpdateManager(this, currentVersion = packageManager.getPackageInfo(packageName, 0).versionName.orEmpty())
+    }
 }

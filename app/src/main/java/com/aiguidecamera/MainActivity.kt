@@ -52,17 +52,21 @@ import com.aiguidecamera.ui.FilterEditViewModel
 import com.aiguidecamera.ui.GalleryScreen
 import com.aiguidecamera.ui.PhotoDetailScreen
 import com.aiguidecamera.ui.SettingsScreen
+import com.aiguidecamera.ui.UpdateDialog
 
-/** 앱 진입점. 권한을 확인한 뒤 화면 이동(카메라 → 갤러리 → 상세 → 필터 편집, 설정)을 구성한다. */
+/** 앱 진입점. 권한을 확인한 뒤 화면 이동(카메라 → 갤러리 → 상세 → 필터 편집, 설정)을 구성하고, 시작할 때 업데이트를 확인한다. */
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 앱을 새로 열 때만 확인한다. 새 버전이 없거나 실패하면 아무것도 띄우지 않는다.
+        if (savedInstanceState == null) (application as AIGuideCameraApp).updateManager.checkForUpdate(silent = true)
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 PermissionGate {
                     AppNavHost()
                 }
+                UpdateDialog()
             }
         }
     }
