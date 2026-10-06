@@ -24,12 +24,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,9 +40,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.aiguidecamera.analysis.SensorReader
 import com.aiguidecamera.camera.CameraController
 import com.aiguidecamera.guide.ShootingMode
 
@@ -61,6 +68,7 @@ fun CameraScreen(
     val filterParams by viewModel.filterParams.collectAsStateWithLifecycle()
     val thumbnails by viewModel.thumbnails.collectAsStateWithLifecycle()
     var showAdjustPanel by remember { mutableStateOf(false) }
+    var showDebug by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(message) {
         val text = message ?: return@LaunchedEffect
@@ -69,6 +77,7 @@ fun CameraScreen(
     }
 
     CaptureRotationTracker(viewModel.cameraController)
+    SensorLifecycle(viewModel.sensorReader)
 
     Column(
         modifier = Modifier
@@ -85,7 +94,27 @@ fun CameraScreen(
             CameraPreview(
                 controller = viewModel.cameraController,
                 filterParams = filterParams,
+                faceBoxes = viewModel.faceBoxes,
                 modifier = Modifier.fillMaxSize(),
+            )
+            if (showDebug) {
+                DebugOverlay(
+                    analysis = viewModel.analysis,
+                    isMirrored = viewModel.cameraController.isFrontCamera,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            Text(
+                text = "DBG",
+                color = if (showDebug) Color.Yellow else Color.White.copy(alpha = 0.6f),
+                fontSize = 12.sp,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .clickable { showDebug = !showDebug }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
             )
             ModeSwitch(
                 mode = mode,
@@ -195,6 +224,26 @@ private fun CaptureRotationTracker(controller: CameraController) {
         }
         listener.enable()
         onDispose { listener.disable() }
+    }
+}
+
+/** 화면이 보일 때만 센서를 켠다 (배터리). */
+@Composable
+private fun SensorLifecycle(sensorReader: SensorReader) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, sensorReader) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> sensorReader.start()
+                Lifecycle.Event.ON_PAUSE -> sensorReader.stop()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            sensorReader.stop()
+        }
     }
 }
 

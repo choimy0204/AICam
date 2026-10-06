@@ -1,5 +1,6 @@
 package com.aiguidecamera.ui
 
+import android.graphics.RectF
 import android.opengl.GLSurfaceView
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -15,6 +16,7 @@ import com.aiguidecamera.AIGuideCameraApp
 import com.aiguidecamera.camera.CameraController
 import com.aiguidecamera.render.FilterParams
 import com.aiguidecamera.render.GLRenderer
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * GLSurfaceView를 Compose에 임베드하고 CameraController와 GLRenderer를 잇는다.
@@ -25,6 +27,7 @@ import com.aiguidecamera.render.GLRenderer
 fun CameraPreview(
     controller: CameraController,
     filterParams: FilterParams,
+    faceBoxes: StateFlow<List<RectF>>,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -59,6 +62,11 @@ fun CameraPreview(
 
     LaunchedEffect(renderer, filterParams) {
         renderer.setFilterParams(filterParams)
+    }
+
+    // 분석 주기(10fps)로 바뀌므로 리컴포지션 없이 직접 수집해 렌더러로 넘긴다.
+    LaunchedEffect(renderer, faceBoxes) {
+        faceBoxes.collect { renderer.setFaceBoxes(it) }
     }
 
     LaunchedEffect(lifecycleOwner) {

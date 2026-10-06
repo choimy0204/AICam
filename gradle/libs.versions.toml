@@ -11,6 +11,7 @@ camerax = "1.4.2"
 room = "2.8.1"
 coil = "2.7.0"
 mlkitFace = "16.1.7"
+mlkitPose = "18.0.0-beta5"
 junit = "4.13.2"
 
 [libraries]
@@ -32,6 +33,7 @@ room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
 room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
 mlkit-face-detection = { module = "com.google.mlkit:face-detection", version.ref = "mlkitFace" }
+mlkit-pose-detection = { module = "com.google.mlkit:pose-detection", version.ref = "mlkitPose" }
 junit = { module = "junit:junit", version.ref = "junit" }
 
 [plugins]

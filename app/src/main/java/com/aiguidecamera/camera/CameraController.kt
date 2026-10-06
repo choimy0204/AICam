@@ -5,8 +5,10 @@ import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.graphics.SurfaceTexture
 import android.media.MediaActionSound
+import android.util.Size
 import android.view.Surface
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
@@ -14,10 +16,12 @@ import androidx.camera.core.Preview
 import androidx.camera.core.SurfaceRequest
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import kotlinx.coroutines.suspendCancellableCoroutine
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -46,7 +50,26 @@ class CameraController(context: Context) {
         .setResolutionSelector(resolutionSelector)
         .build()
 
+    /** 실시간 분석용 저해상도 프레임. 늦으면 최신 프레임만 남긴다. */
+    private val imageAnalysis = ImageAnalysis.Builder()
+        .setResolutionSelector(
+            ResolutionSelector.Builder()
+                .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+                .setResolutionStrategy(
+                    ResolutionStrategy(ANALYSIS_TARGET_SIZE, ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER),
+                )
+                .build(),
+        )
+        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+        .build()
+
+    /** 분석기와 ML Kit 완료 콜백이 함께 쓰는 단일 스레드. */
+    val analysisExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+
     private var lensFacing = CameraSelector.LENS_FACING_BACK
+
+    /** 전면 카메라면 프리뷰가 거울처럼 보인다(디버그 오버레이 좌표 반전용). */
+    val isFrontCamera: Boolean get() = lensFacing == CameraSelector.LENS_FACING_FRONT
 
     /** 메인 스레드에서만 접근. 지금 GL 렌더러가 그리고 있는 SurfaceTexture. */
     private var currentSurfaceTexture: SurfaceTexture? = null
@@ -58,7 +81,15 @@ class CameraController(context: Context) {
         val provider = awaitCameraProvider()
         val selector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
         provider.unbindAll()
-        provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture)
+        provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture, imageAnalysis)
+    }
+
+    fun setAnalyzer(analyzer: ImageAnalysis.Analyzer) {
+        imageAnalysis.setAnalyzer(analysisExecutor, analyzer)
+    }
+
+    fun clearAnalyzer() {
+        imageAnalysis.clearAnalyzer()
     }
 
     /**
@@ -129,5 +160,10 @@ class CameraController(context: Context) {
         val rotated = Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
         decoded.recycle()
         return rotated
+    }
+
+    private companion object {
+        /** 분석 프레임 목표 크기. 포즈·얼굴 검출에 충분하고 10fps 처리에 부담이 적은 크기. */
+        val ANALYSIS_TARGET_SIZE = Size(640, 480)
     }
 }

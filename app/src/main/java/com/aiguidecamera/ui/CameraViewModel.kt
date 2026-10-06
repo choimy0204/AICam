@@ -7,6 +7,9 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.aiguidecamera.AIGuideCameraApp
+import com.aiguidecamera.analysis.FrameAnalysisResult
+import com.aiguidecamera.analysis.FrameAnalyzer
+import com.aiguidecamera.analysis.SensorReader
 import com.aiguidecamera.camera.CameraController
 import com.aiguidecamera.filter.FilterPreset
 import com.aiguidecamera.filter.FilterThumbnailFactory
@@ -51,7 +54,25 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     private val _thumbnails = MutableStateFlow<Map<String, Bitmap>>(emptyMap())
     val thumbnails: StateFlow<Map<String, Bitmap>> = _thumbnails.asStateFlow()
 
+    val sensorReader = SensorReader(application)
+
+    /** 가장 최근 분석 프레임 결과. 분석 스레드에서 갱신된다. */
+    private val _analysis = MutableStateFlow<FrameAnalysisResult?>(null)
+    val analysis: StateFlow<FrameAnalysisResult?> = _analysis.asStateFlow()
+
+    /** 실시간 프리뷰 피부 보정에 쓰는 얼굴 박스(똑바로 선 이미지 기준 0~1). */
+    private val _faceBoxes = MutableStateFlow<List<RectF>>(emptyList())
+    val faceBoxes: StateFlow<List<RectF>> = _faceBoxes.asStateFlow()
+
+    private val frameAnalyzer = FrameAnalyzer(sensorReader, cameraController.analysisExecutor) { result ->
+        _analysis.value = result
+        if (result.faces.isNotEmpty() || _faceBoxes.value.isNotEmpty()) {
+            _faceBoxes.value = result.faces.map { it.box }
+        }
+    }
+
     init {
+        cameraController.setAnalyzer(frameAnalyzer)
         viewModelScope.launch {
             try {
                 _thumbnails.value = FilterThumbnailFactory(app.offscreenRenderer).createAll()
@@ -64,6 +85,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     fun onModeChange(newMode: ShootingMode) {
         if (newMode == _mode.value) return
         _mode.value = newMode
+        frameAnalyzer.mode = newMode
         _filterParams.value = paramsFor(newMode)
     }
 
@@ -152,6 +174,14 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     } catch (error: Exception) {
         Log.w(TAG, "얼굴 검출 실패, 피부 보정 없이 저장합니다", error)
         emptyList()
+    }
+
+    override fun onCleared() {
+        cameraController.clearAnalyzer()
+        sensorReader.stop()
+        // 진행 중인 ML Kit 콜백이 끝난 뒤 검출기를 닫도록 같은 실행기에 넣는다.
+        cameraController.analysisExecutor.execute { frameAnalyzer.close() }
+        cameraController.analysisExecutor.shutdown()
     }
 
     private companion object {
