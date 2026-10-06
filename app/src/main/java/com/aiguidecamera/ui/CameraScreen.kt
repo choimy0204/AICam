@@ -24,6 +24,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,8 +38,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.aiguidecamera.camera.CameraController
+import com.aiguidecamera.guide.ShootingMode
 
-/** 카메라 메인 화면: 4:3 프리뷰, 셔터 버튼, 좌하단 최근 사진 썸네일. */
+/**
+ * 카메라 메인 화면: 상단 모드 토글, 4:3 프리뷰(+필터 조절 패널), 필터 피커, 셔터 버튼, 좌하단 최근 사진 썸네일.
+ */
 @Composable
 fun CameraScreen(
     onThumbnailClick: () -> Unit,
@@ -46,6 +52,10 @@ fun CameraScreen(
     val latestPhoto by viewModel.latestPhoto.collectAsStateWithLifecycle()
     val isCapturing by viewModel.isCapturing.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
+    val mode by viewModel.mode.collectAsStateWithLifecycle()
+    val filterParams by viewModel.filterParams.collectAsStateWithLifecycle()
+    val thumbnails by viewModel.thumbnails.collectAsStateWithLifecycle()
+    var showAdjustPanel by remember { mutableStateOf(false) }
 
     LaunchedEffect(message) {
         val text = message ?: return@LaunchedEffect
@@ -62,17 +72,56 @@ fun CameraScreen(
             .systemBarsPadding(),
     ) {
         Spacer(modifier = Modifier.weight(1f))
-        CameraPreview(
-            controller = viewModel.cameraController,
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(PREVIEW_ASPECT_RATIO),
-        )
+        ) {
+            CameraPreview(
+                controller = viewModel.cameraController,
+                filterParams = filterParams,
+                modifier = Modifier.fillMaxSize(),
+            )
+            ModeSwitch(
+                mode = mode,
+                onModeChange = viewModel::onModeChange,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 12.dp),
+            )
+            if (showAdjustPanel) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                ) {
+                    LabeledSlider(label = "필터 강도", value = filterParams.intensity, onValueChange = viewModel::onIntensityChange)
+                    if (mode == ShootingMode.PORTRAIT) {
+                        LabeledSlider(
+                            label = "피부 보정",
+                            value = filterParams.skinSmoothLevel,
+                            onValueChange = viewModel::onSkinSmoothLevelChange,
+                        )
+                    }
+                }
+            }
+        }
         Spacer(modifier = Modifier.weight(1f))
+        FilterPicker(
+            selectedId = filterParams.preset.id,
+            thumbnails = thumbnails,
+            onSelect = viewModel::onFilterSelect,
+            onSelectedTap = { showAdjustPanel = !showAdjustPanel },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 32.dp, vertical = 24.dp),
+                .padding(horizontal = 32.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {

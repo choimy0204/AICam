@@ -2,6 +2,7 @@ package com.aiguidecamera.render
 
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.graphics.RectF
 import android.opengl.EGL14
 import android.opengl.EGLConfig
 import android.opengl.EGLContext
@@ -23,7 +24,7 @@ import java.util.concurrent.Executors
  * 전용 스레드 하나에 EGL 컨텍스트(1x1 pbuffer)를 만들어 계속 재사용하고, 실제 그리기는 FBO에 한다.
  * 앱 전역에서 하나만 쓰며([com.aiguidecamera.AIGuideCameraApp]) 프로세스 수명 동안 유지한다.
  */
-class OffscreenFilterRenderer {
+class OffscreenFilterRenderer(private val lutLoader: LutLoader) {
 
     private val glDispatcher = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "OffscreenFilterRenderer")
@@ -33,27 +34,33 @@ class OffscreenFilterRenderer {
     private var eglDisplay: EGLDisplay = EGL14.EGL_NO_DISPLAY
     private var eglContext: EGLContext = EGL14.EGL_NO_CONTEXT
     private var eglSurface: EGLSurface = EGL14.EGL_NO_SURFACE
-    private var program: GlProgram? = null
-    private var quad: FullScreenQuad? = null
+    private var filterShader: FilterShader? = null
     private var maxTextureSize = 0
 
     private val identityMatrix = FloatArray(16).also { android.opengl.Matrix.setIdentityM(it, 0) }
 
+    /** FBO의 gl_FragCoord y=0이 저장 비트맵의 첫 행(위)이므로 화면 좌표가 곧 사진 좌표다. */
+    private val imageTransform = floatArrayOf(1f, 1f, 0f, 0f)
+
     /**
-     * [source]에 셰이더를 적용한 결과를 같은 크기의 새 비트맵으로 반환한다.
+     * 똑바로 선 [source]에 [params] 필터를 적용한 결과를 같은 크기의 새 비트맵으로 반환한다.
+     * [faceBoxes]는 피부 보정용 얼굴 박스(사진 기준 0~1 좌표).
      * GPU 한계(GL_MAX_TEXTURE_SIZE)보다 크면 비율을 유지한 채 줄여서 처리한다.
      */
-    suspend fun render(source: Bitmap): Bitmap = withContext(glDispatcher) {
+    suspend fun render(source: Bitmap, params: FilterParams, faceBoxes: List<RectF>): Bitmap = withContext(glDispatcher) {
         ensureEglReady()
+        val shader = requireNotNull(filterShader)
+        shader.setParams(params)
+        shader.setFaceBoxes(faceBoxes)
         val input = downscaleIfNeeded(source)
         try {
-            drawToBitmap(input)
+            drawToBitmap(shader, input)
         } finally {
             if (input !== source) input.recycle()
         }
     }
 
-    private fun drawToBitmap(input: Bitmap): Bitmap {
+    private fun drawToBitmap(shader: FilterShader, input: Bitmap): Bitmap {
         val width = input.width
         val height = input.height
 
@@ -75,16 +82,19 @@ class OffscreenFilterRenderer {
             "FBO 생성 실패 (${width}x$height)"
         }
 
-        val drawProgram = requireNotNull(program)
         GLES30.glViewport(0, 0, width, height)
-        drawProgram.use()
-        GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
-        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, inputTexture)
-        GLES30.glUniform1i(drawProgram.uniformLocation("uTexture"), 0)
         // 업로드한 비트맵의 첫 행이 t=0, glReadPixels의 첫 행도 y=0 → 뒤집힘이 서로 상쇄되어 행렬은 단위행렬이면 된다.
-        GLES30.glUniformMatrix4fv(drawProgram.uniformLocation("uMvpMatrix"), 1, false, identityMatrix, 0)
-        GLES30.glUniformMatrix4fv(drawProgram.uniformLocation("uTexMatrix"), 1, false, identityMatrix, 0)
-        requireNotNull(quad).draw()
+        shader.draw(
+            textureTarget = GLES30.GL_TEXTURE_2D,
+            textureId = inputTexture,
+            mvpMatrix = identityMatrix,
+            texMatrix = identityMatrix,
+            viewWidth = width,
+            viewHeight = height,
+            imageTransform = imageTransform,
+            sourceWidth = width,
+            sourceHeight = height,
+        )
 
         val pixels = ByteBuffer.allocateDirect(width * height * BYTES_PER_PIXEL).order(ByteOrder.nativeOrder())
         GLES30.glReadPixels(0, 0, width, height, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, pixels)
@@ -153,8 +163,7 @@ class OffscreenFilterRenderer {
         GLES30.glGetIntegerv(GLES30.GL_MAX_RENDERBUFFER_SIZE, limits, 0)
         maxTextureSize = minOf(maxTextureSize, limits[0])
 
-        program = GlProgram(ShaderSources.VERTEX, ShaderSources.FRAGMENT_2D)
-        quad = FullScreenQuad()
+        filterShader = FilterShader(ShaderSources.FRAGMENT_2D, lutLoader)
     }
 
     private companion object {

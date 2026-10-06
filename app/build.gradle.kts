@@ -63,5 +63,7 @@ dependencies {
 
     implementation(libs.coil.compose)
 
+    implementation(libs.mlkit.face.detection)
+
     testImplementation(libs.junit)
 }

@@ -1,5 +1,6 @@
 package com.aiguidecamera.render
 
+import android.graphics.RectF
 import android.graphics.SurfaceTexture
 import android.opengl.GLES11Ext
 import android.opengl.GLES30
@@ -12,30 +13,27 @@ import javax.microedition.khronos.opengles.GL10
 
 /**
  * 카메라 프리뷰를 GLSurfaceView에 그리는 렌더러.
- * OES 외부 텍스처(SurfaceTexture) → 프리뷰 셰이더 → 화면. 회전·center-crop은 정점 행렬로 처리한다.
+ * OES 외부 텍스처(SurfaceTexture) → 필터 셰이더 → 화면. 회전·center-crop은 정점 행렬로 처리한다.
  *
- * 스레드: GLSurfaceView.Renderer 콜백은 GL 스레드, [setPreviewGeometry]는 어느 스레드에서 불러도 된다.
+ * 스레드: GLSurfaceView.Renderer 콜백은 GL 스레드, set* 함수는 어느 스레드에서 불러도 된다(queueEvent로 넘긴다).
  * 새 SurfaceTexture가 만들어질 때마다(GL 컨텍스트 재생성 포함) [onSurfaceTextureReady]를 메인 스레드로 알린다.
  */
 class GLRenderer(
     private val glView: GLSurfaceView,
+    private val lutLoader: LutLoader,
     private val onSurfaceTextureReady: (SurfaceTexture) -> Unit,
 ) : GLSurfaceView.Renderer {
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
     // --- GL 스레드 전용 상태 ---
-    private var program: GlProgram? = null
-    private var quad: FullScreenQuad? = null
+    private var filterShader: FilterShader? = null
     private var oesTextureId = 0
     private var surfaceTexture: SurfaceTexture? = null
 
-    private var uMvpMatrix = 0
-    private var uTexMatrix = 0
-    private var uTexture = 0
-
     private val texMatrix = FloatArray(16)
     private val mvpMatrix = FloatArray(16)
+    private val imageTransform = FloatArray(4)
 
     private var viewWidth = 0
     private var viewHeight = 0
@@ -44,14 +42,16 @@ class GLRenderer(
     private var rotationDegrees = 0
     private var mirrorHorizontally = false
 
+    /** GL 컨텍스트가 다시 만들어져도 복원할 수 있도록 마지막 값을 기억한다. */
+    private var filterParams: FilterParams = FilterParams.ORIGINAL
+    private var faceBoxes: List<RectF> = emptyList()
+
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         // GL 컨텍스트가 새로 만들어졌으므로 이전 GL 리소스는 모두 무효다. 새로 만든다.
-        val newProgram = GlProgram(ShaderSources.VERTEX, ShaderSources.FRAGMENT_OES)
-        program = newProgram
-        uMvpMatrix = newProgram.uniformLocation("uMvpMatrix")
-        uTexMatrix = newProgram.uniformLocation("uTexMatrix")
-        uTexture = newProgram.uniformLocation("uTexture")
-        quad = FullScreenQuad()
+        val shader = FilterShader(ShaderSources.FRAGMENT_OES, lutLoader)
+        shader.setParams(filterParams)
+        shader.setFaceBoxes(faceBoxes)
+        filterShader = shader
 
         oesTextureId = createOesTexture()
         val newSurfaceTexture = SurfaceTexture(oesTextureId)
@@ -59,7 +59,7 @@ class GLRenderer(
         surfaceTexture = newSurfaceTexture
 
         Matrix.setIdentityM(texMatrix, 0)
-        Matrix.setIdentityM(mvpMatrix, 0)
+        updateMvpMatrix()
         mainHandler.post { onSurfaceTextureReady(newSurfaceTexture) }
     }
 
@@ -74,21 +74,24 @@ class GLRenderer(
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
 
         val texture = surfaceTexture ?: return
-        val drawProgram = program ?: return
-        val drawQuad = quad ?: return
+        val shader = filterShader ?: return
 
         texture.updateTexImage()
         texture.getTransformMatrix(texMatrix)
         if (bufferWidth == 0 || bufferHeight == 0) return
 
         GLES30.glViewport(0, 0, viewWidth, viewHeight)
-        drawProgram.use()
-        GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
-        GLES30.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTextureId)
-        GLES30.glUniform1i(uTexture, 0)
-        GLES30.glUniformMatrix4fv(uMvpMatrix, 1, false, mvpMatrix, 0)
-        GLES30.glUniformMatrix4fv(uTexMatrix, 1, false, texMatrix, 0)
-        drawQuad.draw()
+        shader.draw(
+            textureTarget = GLES11Ext.GL_TEXTURE_EXTERNAL_OES,
+            textureId = oesTextureId,
+            mvpMatrix = mvpMatrix,
+            texMatrix = texMatrix,
+            viewWidth = viewWidth,
+            viewHeight = viewHeight,
+            imageTransform = imageTransform,
+            sourceWidth = bufferWidth,
+            sourceHeight = bufferHeight,
+        )
     }
 
     /**
@@ -105,9 +108,29 @@ class GLRenderer(
         }
     }
 
-    /** 버퍼를 회전한 뒤 뷰를 꽉 채우도록(center-crop) 확대하는 행렬을 만든다. */
+    fun setFilterParams(params: FilterParams) {
+        glView.queueEvent {
+            filterParams = params
+            filterShader?.setParams(params)
+        }
+        glView.requestRender()
+    }
+
+    /** 얼굴 박스(똑바로 선 사진 기준 0~1 좌표). 프리뷰 피부 보정용으로 Phase 3 분석 결과가 넣는다. */
+    fun setFaceBoxes(boxes: List<RectF>) {
+        glView.queueEvent {
+            faceBoxes = boxes
+            filterShader?.setFaceBoxes(boxes)
+        }
+    }
+
+    /**
+     * 버퍼를 회전한 뒤 뷰를 꽉 채우도록(center-crop) 확대하는 행렬을 만들고,
+     * 화면 좌표 → 똑바로 선 사진 좌표 변환([imageTransform])도 함께 계산한다.
+     */
     private fun updateMvpMatrix() {
         Matrix.setIdentityM(mvpMatrix, 0)
+        setImageTransform(1f, 1f, mirror = false)
         if (viewWidth == 0 || viewHeight == 0 || bufferWidth == 0 || bufferHeight == 0) return
 
         val isSideways = rotationDegrees % 180 != 0
@@ -123,11 +146,24 @@ class GLRenderer(
         } else {
             scaleY = viewAspect / contentAspect
         }
+        setImageTransform(visibleX = 1f / scaleX, visibleY = 1f / scaleY, mirror = mirrorHorizontally)
         if (mirrorHorizontally) scaleX = -scaleX
 
         // 최종 = Scale * Rotate. setRotateM은 반시계 방향이 양수이므로 시계방향 회전은 음수로 준다.
         Matrix.scaleM(mvpMatrix, 0, scaleX, scaleY, 1f)
         Matrix.rotateM(mvpMatrix, 0, -rotationDegrees.toFloat(), 0f, 0f, 1f)
+    }
+
+    /**
+     * 화면에는 사진의 가운데 [visibleX] x [visibleY] 비율만 보인다.
+     * 화면 좌표는 아래가 0, 사진 좌표는 위가 0이므로 y를 뒤집는다. 거울 모드면 x도 뒤집는다(저장본은 거울상이 아니다).
+     */
+    private fun setImageTransform(visibleX: Float, visibleY: Float, mirror: Boolean) {
+        val signX = if (mirror) -1f else 1f
+        imageTransform[0] = signX * visibleX
+        imageTransform[1] = -visibleY
+        imageTransform[2] = 0.5f - signX * visibleX * 0.5f
+        imageTransform[3] = 0.5f + visibleY * 0.5f
     }
 
     private fun createOesTexture(): Int {

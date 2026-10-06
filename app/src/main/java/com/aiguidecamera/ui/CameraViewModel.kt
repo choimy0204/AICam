@@ -2,11 +2,16 @@ package com.aiguidecamera.ui
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.graphics.RectF
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.aiguidecamera.AIGuideCameraApp
 import com.aiguidecamera.camera.CameraController
+import com.aiguidecamera.filter.FilterPreset
+import com.aiguidecamera.filter.FilterThumbnailFactory
 import com.aiguidecamera.guide.ShootingMode
+import com.aiguidecamera.render.FilterParams
 import com.aiguidecamera.storage.PhotoRecord
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -16,12 +21,13 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * 카메라 화면 상태와 "촬영 → 오프스크린 렌더 → 저장 → PhotoRecord 기록" 흐름을 관리한다.
+ * 카메라 화면 상태(모드·필터·강도)와 "촬영 → 얼굴 검출 → 오프스크린 렌더 → 저장 → PhotoRecord 기록" 흐름을 관리한다.
  */
 class CameraViewModel(application: Application) : AndroidViewModel(application) {
 
     private val app = application as AIGuideCameraApp
     private val photoDao = app.database.photoRecordDao()
+    private val filterPreferences = app.filterPreferences
 
     val cameraController = CameraController(application)
 
@@ -35,10 +41,47 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
-    private val mode = ShootingMode.PORTRAIT
+    private val _mode = MutableStateFlow(ShootingMode.PORTRAIT)
+    val mode: StateFlow<ShootingMode> = _mode.asStateFlow()
+
+    private val _filterParams = MutableStateFlow(paramsFor(ShootingMode.PORTRAIT))
+    val filterParams: StateFlow<FilterParams> = _filterParams.asStateFlow()
+
+    /** 필터 id → 피커 썸네일. 앱 시작 직후 한 번 만든다. */
+    private val _thumbnails = MutableStateFlow<Map<String, Bitmap>>(emptyMap())
+    val thumbnails: StateFlow<Map<String, Bitmap>> = _thumbnails.asStateFlow()
 
     /** "원본도 함께 저장" 설정. 설정 화면은 Phase 6에서 연결한다. */
     private val saveOriginalToo = false
+
+    init {
+        viewModelScope.launch {
+            try {
+                _thumbnails.value = FilterThumbnailFactory(app.offscreenRenderer).createAll()
+            } catch (error: Exception) {
+                Log.w(TAG, "필터 썸네일 생성 실패", error)
+            }
+        }
+    }
+
+    fun onModeChange(newMode: ShootingMode) {
+        if (newMode == _mode.value) return
+        _mode.value = newMode
+        _filterParams.value = paramsFor(newMode)
+    }
+
+    fun onFilterSelect(preset: FilterPreset) {
+        updateParams(_filterParams.value.copy(preset = preset))
+    }
+
+    fun onIntensityChange(intensity: Float) {
+        updateParams(_filterParams.value.copy(intensity = intensity))
+    }
+
+    fun onSkinSmoothLevelChange(level: Float) {
+        _filterParams.value = _filterParams.value.copy(skinSmoothLevel = level)
+        filterPreferences.saveSkinSmoothLevel(level)
+    }
 
     fun onShutterClick() {
         if (_isCapturing.value) return
@@ -58,12 +101,27 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         _message.value = null
     }
 
+    private fun updateParams(params: FilterParams) {
+        _filterParams.value = params
+        filterPreferences.save(_mode.value, params.preset, params.intensity)
+    }
+
+    /** 피부 보정은 인물 모드에서만 쓴다. 음식 모드는 0으로 둔다. */
+    private fun paramsFor(mode: ShootingMode) = FilterParams(
+        preset = filterPreferences.filterFor(mode),
+        intensity = filterPreferences.intensityFor(mode),
+        skinSmoothLevel = if (mode == ShootingMode.PORTRAIT) filterPreferences.skinSmoothLevel() else 0f,
+    )
+
     private suspend fun captureAndSave() {
         val createdAt = System.currentTimeMillis()
+        val params = _filterParams.value
+        val shotMode = _mode.value
         val original = cameraController.takePicture()
         var filtered: Bitmap? = null
         try {
-            filtered = app.offscreenRenderer.render(original)
+            val faceBoxes = if (params.skinSmoothLevel > 0f) detectFacesSafely(original) else emptyList()
+            filtered = app.offscreenRenderer.render(original, params, faceBoxes)
 
             val saver = app.photoSaver
             val baseName = saver.baseNameFor(createdAt)
@@ -78,10 +136,10 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                 PhotoRecord(
                     filteredUri = filteredUri.toString(),
                     originalUri = originalUri?.toString(),
-                    filterId = FILTER_ID_NONE,
-                    filterIntensity = 0f,
-                    skinSmoothLevel = 0f,
-                    mode = mode.name,
+                    filterId = params.preset.id,
+                    filterIntensity = params.intensity,
+                    skinSmoothLevel = params.skinSmoothLevel,
+                    mode = shotMode.name,
                     createdAt = createdAt,
                 ),
             )
@@ -91,8 +149,16 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    /** 얼굴 검출이 실패해도 사진은 저장되어야 하므로, 실패하면 피부 보정 없이 진행한다. */
+    private suspend fun detectFacesSafely(bitmap: Bitmap): List<RectF> = try {
+        app.stillFaceDetector.detect(bitmap)
+    } catch (error: Exception) {
+        Log.w(TAG, "얼굴 검출 실패, 피부 보정 없이 저장합니다", error)
+        emptyList()
+    }
+
     private companion object {
+        const val TAG = "CameraViewModel"
         const val STOP_TIMEOUT_MS = 5_000L
-        const val FILTER_ID_NONE = "none"
     }
 }
