@@ -16,8 +16,13 @@ android {
         minSdk = 26
         targetSdk = 36
         // 배포할 때마다 둘 다 올린다. 앱은 versionName을 GitHub 릴리스 태그(v1.0 등)와 비교한다.
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.1"
+
+        // 실제 폰은 거의 모두 64비트 ARM. 다른 CPU용 ML Kit 네이티브 라이브러리를 빼서 APK를 줄인다.
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
     }
 
     // 배포용 서명 키는 저장소에 올리지 않는다 (keystore.properties, keystore/ 는 .gitignore).

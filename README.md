@@ -6,7 +6,7 @@
 
 **[최신 버전 APK 내려받기](https://github.com/choimy0204/AICam/releases/latest/download/AICam.apk)** · [모든 버전](https://github.com/choimy0204/AICam/releases)
 
-- Android 8.0 (API 26) 이상
+- Android 8.0 (API 26) 이상, 64비트 ARM 기기 (요즘 폰은 거의 모두 해당)
 - 처음 설치할 때 "출처를 알 수 없는 앱 설치"를 허용해야 합니다.
 - 설치한 뒤에는 앱을 열 때마다 새 버전을 확인합니다. 설정 > "업데이트 확인"으로 직접 확인할 수도 있습니다.
 
