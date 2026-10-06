@@ -1,6 +1,5 @@
 package com.aiguidecamera.analysis
 
-import android.graphics.RectF
 import com.google.android.gms.tasks.Task
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.Face
@@ -30,7 +29,7 @@ class FaceAnalyzer {
             .map { face ->
                 val box = face.boundingBox
                 FaceInfo(
-                    box = RectF(
+                    box = NormRect(
                         (box.left / width).coerceIn(0f, 1f),
                         (box.top / height).coerceIn(0f, 1f),
                         (box.right / width).coerceIn(0f, 1f),

@@ -98,6 +98,7 @@ class FrameAnalyzer(
                 meanGreen = lightAnalyzer.meanGreen,
                 meanBlue = lightAnalyzer.meanBlue,
                 rollDeg = sensorReader.rollDeg,
+                deviceRollDeg = sensorReader.deviceRollDeg,
                 pitchDeg = sensorReader.pitchDeg,
                 gyroMagnitude = sensorReader.consumeGyroPeak(),
                 poseMotion = motion,

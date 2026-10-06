@@ -1,7 +1,5 @@
 package com.aiguidecamera.analysis
 
-import android.graphics.RectF
-
 /**
  * 분석 프레임 하나의 모든 결과. 규칙 엔진·자동 촬영·디버그 오버레이가 이것만 보고 판단한다.
  *
@@ -23,6 +21,8 @@ data class FrameAnalysisResult(
     val meanBlue: Float,
     /** 폰을 잡은 방향(세로/가로) 기준 기울기. -45~45도, 0이면 수평. */
     val rollDeg: Float,
+    /** 정규화 전 기기 롤(-180~180). 화면(세로 고정)에 실제 수평선을 그릴 때 쓴다. */
+    val deviceRollDeg: Float,
     /** 후면 카메라가 수평선 아래를 향하는 각도. 0 = 정면, 90 = 바로 아래(탑뷰), 음수 = 위를 봄. */
     val pitchDeg: Float,
     /** 직전 분석 이후 자이로 각속도 크기의 최댓값 (rad/s). */
@@ -46,10 +46,18 @@ enum class BodyPart {
 data class Landmark(val x: Float, val y: Float, val confidence: Float)
 
 data class FaceInfo(
-    val box: RectF,
+    val box: NormRect,
     /** 0~1. 검출기가 판단하지 못하면 null. */
     val leftEyeOpenProbability: Float?,
     val rightEyeOpenProbability: Float?,
     /** 얼굴 좌우 회전각(도). */
     val headEulerY: Float,
 )
+
+/** 0~1 정규화 사각형. android.graphics.RectF 대신 써서 규칙을 JVM 단위 테스트할 수 있게 한다. */
+data class NormRect(val left: Float, val top: Float, val right: Float, val bottom: Float) {
+    val width: Float get() = right - left
+    val height: Float get() = bottom - top
+
+    fun contains(x: Float, y: Float): Boolean = x >= left && x < right && y >= top && y < bottom
+}

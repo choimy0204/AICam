@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aiguidecamera.guide.FoodAngle
 import com.aiguidecamera.guide.ShootingMode
 
 /** 화면 상단 인물 / 음식 모드 토글. */
@@ -23,6 +24,41 @@ fun ModeSwitch(
     onModeChange: (ShootingMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    SegmentedSwitch(
+        items = ShootingMode.entries,
+        selected = mode,
+        label = ::labelOf,
+        onSelect = onModeChange,
+        modifier = modifier,
+    )
+}
+
+/** 음식 모드 목표 각도(탑뷰 / 45°) 토글. */
+@Composable
+fun FoodAngleSwitch(
+    angle: FoodAngle,
+    onAngleChange: (FoodAngle) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SegmentedSwitch(
+        items = FoodAngle.entries,
+        selected = angle,
+        label = FoodAngle::label,
+        onSelect = onAngleChange,
+        modifier = modifier,
+        compact = true,
+    )
+}
+
+@Composable
+private fun <T> SegmentedSwitch(
+    items: List<T>,
+    selected: T,
+    label: (T) -> String,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+) {
     val shape = RoundedCornerShape(50)
     Row(
         modifier = modifier
@@ -30,20 +66,20 @@ fun ModeSwitch(
             .background(Color.Black.copy(alpha = 0.45f))
             .padding(4.dp),
     ) {
-        ShootingMode.entries.forEach { item ->
-            val selected = item == mode
+        items.forEach { item ->
+            val isSelected = item == selected
             Box(
                 modifier = Modifier
                     .clip(shape)
-                    .background(if (selected) Color.White else Color.Transparent)
-                    .clickable { onModeChange(item) }
-                    .padding(horizontal = 18.dp, vertical = 6.dp),
+                    .background(if (isSelected) Color.White else Color.Transparent)
+                    .clickable { onSelect(item) }
+                    .padding(horizontal = if (compact) 12.dp else 18.dp, vertical = if (compact) 4.dp else 6.dp),
             ) {
                 Text(
-                    text = labelOf(item),
-                    color = if (selected) Color.Black else Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                    text = label(item),
+                    color = if (isSelected) Color.Black else Color.White,
+                    fontSize = if (compact) 12.sp else 14.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                 )
             }
         }

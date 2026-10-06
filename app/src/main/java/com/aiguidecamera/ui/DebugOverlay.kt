@@ -51,7 +51,7 @@ fun DebugOverlay(
                 drawRect(
                     color = Color.Yellow,
                     topLeft = Offset(left, face.box.top * size.height),
-                    size = Size(face.box.width() * size.width, face.box.height() * size.height),
+                    size = Size(face.box.width * size.width, face.box.height * size.height),
                     style = Stroke(width = FACE_STROKE_PX),
                 )
             }

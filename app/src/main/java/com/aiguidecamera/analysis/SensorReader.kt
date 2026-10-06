@@ -24,6 +24,9 @@ class SensorReader(context: Context) : SensorEventListener {
     @Volatile var rollDeg = 0f
         private set
 
+    @Volatile var deviceRollDeg = 0f
+        private set
+
     @Volatile var pitchDeg = 0f
         private set
 
@@ -65,6 +68,7 @@ class SensorReader(context: Context) : SensorEventListener {
         // R[6..8] = 기기 좌표계로 본 "위쪽" 방향. 후면 카메라는 기기 -Z를 보므로 R[8]이 클수록 아래를 본다.
         pitchDeg = Math.toDegrees(asin(rotationMatrix[8].coerceIn(-1f, 1f).toDouble())).toFloat()
         val rawRoll = Math.toDegrees(atan2(rotationMatrix[6], rotationMatrix[7]).toDouble()).toFloat()
+        deviceRollDeg = rawRoll
         // 세로·가로 어느 쪽으로 잡았든 가장 가까운 90도 방향 기준 기울기로 만든다.
         rollDeg = rawRoll - (rawRoll / QUARTER_TURN_DEG).roundToInt() * QUARTER_TURN_DEG
     }

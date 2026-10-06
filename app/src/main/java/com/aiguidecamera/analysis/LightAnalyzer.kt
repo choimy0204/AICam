@@ -1,6 +1,5 @@
 package com.aiguidecamera.analysis
 
-import android.graphics.RectF
 import androidx.camera.core.ImageProxy
 import com.aiguidecamera.guide.GuideConstants
 
@@ -25,7 +24,7 @@ class LightAnalyzer {
     /**
      * [faceBox]는 똑바로 선 이미지 기준 0~1 좌표. 버퍼 좌표를 회전 방향에 맞춰 똑바로 선 좌표로 바꿔 비교한다.
      */
-    fun analyze(image: ImageProxy, rotationDegrees: Int, faceBox: RectF?) {
+    fun analyze(image: ImageProxy, rotationDegrees: Int, faceBox: NormRect?) {
         val yPlane = image.planes[0]
         val uPlane = image.planes[1]
         val vPlane = image.planes[2]

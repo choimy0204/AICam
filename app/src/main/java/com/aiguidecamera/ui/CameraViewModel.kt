@@ -13,6 +13,10 @@ import com.aiguidecamera.analysis.SensorReader
 import com.aiguidecamera.camera.CameraController
 import com.aiguidecamera.filter.FilterPreset
 import com.aiguidecamera.filter.FilterThumbnailFactory
+import com.aiguidecamera.guide.Advice
+import com.aiguidecamera.guide.FoodAngle
+import com.aiguidecamera.guide.IssueStabilizer
+import com.aiguidecamera.guide.RuleEngine
 import com.aiguidecamera.guide.ShootingMode
 import com.aiguidecamera.render.FilterParams
 import com.aiguidecamera.storage.PhotoRecord
@@ -24,7 +28,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * 카메라 화면 상태(모드·필터·강도)와 "촬영 → 얼굴 검출 → 오프스크린 렌더 → 저장 → PhotoRecord 기록" 흐름을 관리한다.
+ * 카메라 화면 상태(모드·필터·강도·조언)와 "촬영 → 얼굴 검출 → 오프스크린 렌더 → 저장 → PhotoRecord 기록" 흐름을 관리한다.
  */
 class CameraViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -64,10 +68,21 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     private val _faceBoxes = MutableStateFlow<List<RectF>>(emptyList())
     val faceBoxes: StateFlow<List<RectF>> = _faceBoxes.asStateFlow()
 
+    private val _foodAngle = MutableStateFlow(FoodAngle.TOP_VIEW)
+    val foodAngle: StateFlow<FoodAngle> = _foodAngle.asStateFlow()
+
+    /** 안정화를 거친 조언 1개. 아래 엔진·안정화기는 분석 스레드에서만 쓴다. */
+    private val _advice = MutableStateFlow<Advice>(Advice.Pending)
+    val advice: StateFlow<Advice> = _advice.asStateFlow()
+    private val ruleEngine = RuleEngine()
+    private val issueStabilizer = IssueStabilizer()
+
     private val frameAnalyzer = FrameAnalyzer(sensorReader, cameraController.analysisExecutor) { result ->
         _analysis.value = result
+        val issues = ruleEngine.evaluate(result, _mode.value, _foodAngle.value)
+        _advice.value = issueStabilizer.update(issues)
         if (result.faces.isNotEmpty() || _faceBoxes.value.isNotEmpty()) {
-            _faceBoxes.value = result.faces.map { it.box }
+            _faceBoxes.value = result.faces.map { RectF(it.box.left, it.box.top, it.box.right, it.box.bottom) }
         }
     }
 
@@ -87,6 +102,19 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         _mode.value = newMode
         frameAnalyzer.mode = newMode
         _filterParams.value = paramsFor(newMode)
+        resetAdvice()
+    }
+
+    fun onFoodAngleChange(angle: FoodAngle) {
+        if (angle == _foodAngle.value) return
+        _foodAngle.value = angle
+        resetAdvice()
+    }
+
+    /** 규칙 묶음이 바뀌었으니 이전 프레임 기록을 버린다. 안정화기는 분석 스레드에서 초기화한다. */
+    private fun resetAdvice() {
+        _advice.value = Advice.Pending
+        cameraController.analysisExecutor.execute { issueStabilizer.reset() }
     }
 
     fun onFilterSelect(preset: FilterPreset) {

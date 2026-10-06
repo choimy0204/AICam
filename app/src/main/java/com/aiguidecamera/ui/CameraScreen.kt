@@ -49,7 +49,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.aiguidecamera.analysis.SensorReader
 import com.aiguidecamera.camera.CameraController
+import com.aiguidecamera.guide.Advice
 import com.aiguidecamera.guide.ShootingMode
+import com.aiguidecamera.guide.rules.HorizonRule
 
 /**
  * 카메라 메인 화면: 상단 모드 토글, 4:3 프리뷰(+필터 조절 패널), 필터 피커, 셔터 버튼, 좌하단 최근 사진 썸네일.
@@ -67,6 +69,9 @@ fun CameraScreen(
     val mode by viewModel.mode.collectAsStateWithLifecycle()
     val filterParams by viewModel.filterParams.collectAsStateWithLifecycle()
     val thumbnails by viewModel.thumbnails.collectAsStateWithLifecycle()
+    val advice by viewModel.advice.collectAsStateWithLifecycle()
+    val foodAngle by viewModel.foodAngle.collectAsStateWithLifecycle()
+    val isHorizonIssue = (advice as? Advice.Problem)?.issue?.ruleId == HorizonRule.ID
     var showAdjustPanel by remember { mutableStateOf(false) }
     var showDebug by rememberSaveable { mutableStateOf(false) }
 
@@ -89,7 +94,11 @@ fun CameraScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(PREVIEW_ASPECT_RATIO),
+                .aspectRatio(PREVIEW_ASPECT_RATIO)
+                .border(
+                    width = 3.dp,
+                    color = if (advice == Advice.Good) GOOD_GREEN else Color.Transparent,
+                ),
         ) {
             CameraPreview(
                 controller = viewModel.cameraController,
@@ -97,6 +106,9 @@ fun CameraScreen(
                 faceBoxes = viewModel.faceBoxes,
                 modifier = Modifier.fillMaxSize(),
             )
+            if (isHorizonIssue) {
+                HorizonLine(analysis = viewModel.analysis, modifier = Modifier.fillMaxSize())
+            }
             if (showDebug) {
                 DebugOverlay(
                     analysis = viewModel.analysis,
@@ -116,28 +128,43 @@ fun CameraScreen(
                     .clickable { showDebug = !showDebug }
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             )
-            ModeSwitch(
-                mode = mode,
-                onModeChange = viewModel::onModeChange,
+            Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 12.dp),
-            )
-            if (showAdjustPanel) {
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .background(Color.Black.copy(alpha = 0.5f))
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                ) {
-                    LabeledSlider(label = "필터 강도", value = filterParams.intensity, onValueChange = viewModel::onIntensityChange)
-                    if (mode == ShootingMode.PORTRAIT) {
-                        LabeledSlider(
-                            label = "피부 보정",
-                            value = filterParams.skinSmoothLevel,
-                            onValueChange = viewModel::onSkinSmoothLevelChange,
-                        )
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                ModeSwitch(mode = mode, onModeChange = viewModel::onModeChange)
+                if (mode == ShootingMode.FOOD) {
+                    FoodAngleSwitch(
+                        angle = foodAngle,
+                        onAngleChange = viewModel::onFoodAngleChange,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                AdviceBanner(advice = advice, modifier = Modifier.padding(bottom = 12.dp))
+                if (showAdjustPanel) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color.Black.copy(alpha = 0.5f))
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                    ) {
+                        LabeledSlider(label = "필터 강도", value = filterParams.intensity, onValueChange = viewModel::onIntensityChange)
+                        if (mode == ShootingMode.PORTRAIT) {
+                            LabeledSlider(
+                                label = "피부 보정",
+                                value = filterParams.skinSmoothLevel,
+                                onValueChange = viewModel::onSkinSmoothLevelChange,
+                            )
+                        }
                     }
                 }
             }

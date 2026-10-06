@@ -19,6 +19,21 @@ object GuideConstants {
     const val CAMERA_DOWNWARD_PITCH_MAX_DEG = 10.0f
     const val BACKLIGHT_RATIO_MIN = 0.6f
 
+    /** 화면 전체가 이보다 어두우면 역광 비율을 믿을 수 없어 판정하지 않는다. */
+    const val BACKLIGHT_FRAME_BRIGHTNESS_MIN = 0.05f
+
+    /** 전신에서 (코→엉덩이 길이) / (엉덩이→발목 길이)가 이보다 크면 위에서 내려다본 것으로 본다 (다리가 짧아 보임). */
+    const val LOOKDOWN_TORSO_LEG_RATIO_MAX = 1.0f
+
+    /** 얼굴 박스 위로 머리카락이 차지하는 높이 (얼굴 박스 높이 대비). 정수리 추정용. */
+    const val HEAD_TOP_ABOVE_FACE_RATIO = 0.25f
+
+    /** 얼굴 박스가 없을 때 정수리 추정: 코 위로 (어깨선→코 거리) × 이 비율. */
+    const val HEAD_TOP_ABOVE_NOSE_RATIO = 0.65f
+
+    /** 피치가 이보다 크면(바닥을 내려다봄) 롤로 수평을 판단할 수 없어 수평 규칙을 건너뛴다. */
+    const val HORIZON_MAX_PITCH_DEG = 60.0f
+
     // ── 음식 ─────────────────────────────────────────────────────────────
     const val FOOD_TOPVIEW_PITCH_MIN = 85.0f
     const val FOOD_TOPVIEW_PITCH_MAX = 90.0f
@@ -27,6 +42,9 @@ object GuideConstants {
     const val COLOR_CAST_RB_RATIO_MAX = 1.35f
     const val COLOR_CAST_RB_RATIO_MIN = 0.75f
     const val UNDEREXPOSED_MEAN_LUMA_MIN = 0.30f
+
+    /** 파랑 평균이 이보다 작으면 R/B 비율이 의미 없어 색 판정을 하지 않는다. */
+    const val COLOR_CAST_CHANNEL_MIN = 0.02f
 
     // ── 자동 촬영 공통 ───────────────────────────────────────────────────
     const val EYE_OPEN_PROB_MIN = 0.7f
