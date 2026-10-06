@@ -10,6 +10,7 @@ import com.aiguidecamera.guide.rules.HeadroomRule
 import com.aiguidecamera.guide.rules.HorizonRule
 import com.aiguidecamera.guide.rules.Issue
 import com.aiguidecamera.guide.rules.Rule
+import com.aiguidecamera.guide.rules.SubjectPresenceRule
 
 /**
  * 모드(와 음식 목표 각도)에 맞는 규칙 묶음을 돌려 이번 프레임의 문제 목록을 만든다.
@@ -18,6 +19,7 @@ import com.aiguidecamera.guide.rules.Rule
 class RuleEngine {
 
     private val portraitRules: List<Rule> = listOf(
+        SubjectPresenceRule(),
         CameraHeightRule(),
         BodyCropRule(),
         HeadroomRule(),

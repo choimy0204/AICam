@@ -19,6 +19,12 @@ object GuideConstants {
     const val CAMERA_DOWNWARD_PITCH_MAX_DEG = 10.0f
     const val BACKLIGHT_RATIO_MIN = 0.6f
 
+    /** 전신이 아닐 때 얼굴 박스 높이가 이보다 작으면 "인물이 너무 작다"고 본다 (예: 멀리 있는 사람, 거울 속 얼굴). */
+    const val SUBJECT_FACE_HEIGHT_MIN = 0.07f
+
+    /** 전신에서 코→발목 길이가 이보다 짧으면 "인물이 너무 작다"고 본다. */
+    const val SUBJECT_BODY_SPAN_MIN = 0.45f
+
     /** 화면 전체가 이보다 어두우면 역광 비율을 믿을 수 없어 판정하지 않는다. */
     const val BACKLIGHT_FRAME_BRIGHTNESS_MIN = 0.05f
 
