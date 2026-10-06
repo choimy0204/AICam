@@ -82,6 +82,13 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     private val _faceBoxes = MutableStateFlow<List<RectF>>(emptyList())
     val faceBoxes: StateFlow<List<RectF>> = _faceBoxes.asStateFlow()
 
+    private val _isFrontCamera = MutableStateFlow(false)
+    val isFrontCamera: StateFlow<Boolean> = _isFrontCamera.asStateFlow()
+
+    /** 전면 카메라가 있는 기기에서만 전환 버튼을 보여준다. */
+    private val _canSwitchCamera = MutableStateFlow(false)
+    val canSwitchCamera: StateFlow<Boolean> = _canSwitchCamera.asStateFlow()
+
     private val _foodAngle = MutableStateFlow(FoodAngle.TOP_VIEW)
     val foodAngle: StateFlow<FoodAngle> = _foodAngle.asStateFlow()
 
@@ -114,6 +121,14 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     init {
         cameraController.setAnalyzer(frameAnalyzer)
         viewModelScope.launch {
+            _canSwitchCamera.value = try {
+                cameraController.hasFrontCamera()
+            } catch (error: Exception) {
+                Log.w(TAG, "전면 카메라 확인 실패", error)
+                false
+            }
+        }
+        viewModelScope.launch {
             try {
                 _thumbnails.value = FilterThumbnailFactory(app.offscreenRenderer).createAll()
             } catch (error: Exception) {
@@ -133,6 +148,30 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     fun onFoodAngleChange(angle: FoodAngle) {
         if (angle == _foodAngle.value) return
         _foodAngle.value = angle
+        resetAdvice()
+    }
+
+    /** 촬영 중에는 전환하지 않는다. 실제 재바인딩은 CameraPreview가 [isFrontCamera]를 보고 한다. */
+    fun onSwitchCamera() {
+        if (_isCapturing.value) return
+        setFrontCamera(!_isFrontCamera.value)
+    }
+
+    /** 카메라를 열지 못했을 때. 전면이었다면 후면으로 되돌린다. */
+    fun onCameraError(error: Exception) {
+        Log.e(TAG, "카메라 바인딩 실패", error)
+        if (_isFrontCamera.value) {
+            _message.value = "전면 카메라를 열 수 없어 후면 카메라로 돌아갈게요"
+            setFrontCamera(false)
+        } else {
+            _message.value = "카메라를 열 수 없어요. 다른 앱이 카메라를 쓰고 있는지 확인해 주세요"
+        }
+    }
+
+    private fun setFrontCamera(front: Boolean) {
+        _isFrontCamera.value = front
+        frameAnalyzer.isFrontCamera = front
+        _faceBoxes.value = emptyList()
         resetAdvice()
     }
 

@@ -20,16 +20,18 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aiguidecamera.analysis.FrameAnalysisResult
 import com.aiguidecamera.guide.GuideConstants
+import com.aiguidecamera.render.FrameRateMeter
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * 임계값 튜닝용 디버그 오버레이: 프리뷰 위에 포즈 랜드마크·얼굴 박스를 그리고, 기울기·밝기 등 수치를 글로 보여준다.
+ * 임계값 튜닝용 디버그 오버레이: 프리뷰 위에 포즈 랜드마크·얼굴 박스를 그리고, 기울기·밝기·프리뷰 fps·분석 지연 등 수치를 글로 보여준다.
  * 프리뷰와 분석 프레임이 모두 4:3이라 0~1 좌표를 프리뷰 영역에 그대로 대응시킨다. 전면 카메라면 좌우 반전.
  */
 @Composable
 fun DebugOverlay(
     analysis: StateFlow<FrameAnalysisResult?>,
     isMirrored: Boolean,
+    previewFrameRate: FrameRateMeter,
     modifier: Modifier = Modifier,
 ) {
     val result by analysis.collectAsStateWithLifecycle()
@@ -57,7 +59,7 @@ fun DebugOverlay(
             }
         }
         Text(
-            text = debugText(current),
+            text = debugText(current, previewFrameRate.fps),
             color = Color.White,
             fontSize = 11.sp,
             fontFamily = FontFamily.Monospace,
@@ -71,10 +73,11 @@ fun DebugOverlay(
     }
 }
 
-private fun debugText(result: FrameAnalysisResult): String {
+private fun debugText(result: FrameAnalysisResult, previewFps: Float): String {
     val face = result.primaryFace
     val visibleJoints = result.landmarks.values.count { it.confidence >= GuideConstants.LANDMARK_CONFIDENCE_MIN }
     return buildString {
+        appendLine("preview %.0ffps  analysis %dms".format(previewFps, result.analysisLatencyMs))
         appendLine("roll %+.1f°  pitch %+.1f°  gyro %.3f".format(result.rollDeg, result.pitchDeg, result.gyroMagnitude))
         appendLine("frame Y %.2f  face Y %s".format(result.frameBrightness, result.faceBrightness?.let { "%.2f".format(it) } ?: "-"))
         appendLine(

@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -56,7 +57,7 @@ import com.aiguidecamera.guide.ShootingMode
 import com.aiguidecamera.guide.rules.HorizonRule
 
 /**
- * 카메라 메인 화면: 상단 모드 토글, 자동 촬영(AUTO) 토글, 4:3 프리뷰(+필터 조절 패널), 필터 피커, 셔터 버튼, 좌하단 최근 사진 썸네일.
+ * 카메라 메인 화면: 상단 설정 버튼·모드 토글, 자동 촬영(AUTO) 토글, 전면/후면 전환 버튼, 4:3 프리뷰(+필터 조절 패널), 필터 피커, 셔터 버튼, 좌하단 최근 사진 썸네일.
  */
 @Composable
 fun CameraScreen(
@@ -76,6 +77,8 @@ fun CameraScreen(
     val autoCaptureEnabled by viewModel.autoCaptureEnabled.collectAsStateWithLifecycle()
     val autoCaptureState by viewModel.autoCaptureState.collectAsStateWithLifecycle()
     val readiness by viewModel.readiness.collectAsStateWithLifecycle()
+    val isFrontCamera by viewModel.isFrontCamera.collectAsStateWithLifecycle()
+    val canSwitchCamera by viewModel.canSwitchCamera.collectAsStateWithLifecycle()
     val autoCaptureMessage = if (autoCaptureEnabled) autoCaptureMessage(autoCaptureState, readiness) else null
     val isHorizonIssue = (advice as? Advice.Problem)?.issue?.ruleId == HorizonRule.ID
     var showAdjustPanel by remember { mutableStateOf(false) }
@@ -96,6 +99,11 @@ fun CameraScreen(
             .background(Color.Black)
             .systemBarsPadding(),
     ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            IconButton(onClick = onSettingsClick) {
+                Icon(Icons.Filled.Settings, contentDescription = "설정", tint = Color.White)
+            }
+        }
         Spacer(modifier = Modifier.weight(1f))
         Box(
             modifier = Modifier
@@ -110,6 +118,8 @@ fun CameraScreen(
                 controller = viewModel.cameraController,
                 filterParams = filterParams,
                 faceBoxes = viewModel.faceBoxes,
+                isFrontCamera = isFrontCamera,
+                onCameraError = viewModel::onCameraError,
                 modifier = Modifier.fillMaxSize(),
             )
             if (isHorizonIssue) {
@@ -118,7 +128,8 @@ fun CameraScreen(
             if (showDebug) {
                 DebugOverlay(
                     analysis = viewModel.analysis,
-                    isMirrored = viewModel.cameraController.isFrontCamera,
+                    isMirrored = isFrontCamera,
+                    previewFrameRate = viewModel.cameraController.previewFrameRate,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -199,8 +210,14 @@ fun CameraScreen(
             LatestThumbnail(uri = latestPhoto?.filteredUri, onClick = onThumbnailClick)
             ShutterButton(enabled = !isCapturing, onClick = viewModel::onShutterClick)
             Box(modifier = Modifier.size(THUMBNAIL_SIZE), contentAlignment = Alignment.Center) {
-                IconButton(onClick = onSettingsClick) {
-                    Icon(Icons.Filled.Settings, contentDescription = "설정", tint = Color.White)
+                if (canSwitchCamera) {
+                    IconButton(onClick = viewModel::onSwitchCamera, enabled = !isCapturing) {
+                        Icon(
+                            Icons.Filled.Cameraswitch,
+                            contentDescription = if (isFrontCamera) "후면 카메라로 전환" else "전면 카메라로 전환",
+                            tint = Color.White,
+                        )
+                    }
                 }
             }
         }

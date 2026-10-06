@@ -21,6 +21,8 @@ import javax.microedition.khronos.opengles.GL10
 class GLRenderer(
     private val glView: GLSurfaceView,
     private val lutLoader: LutLoader,
+    /** 그린 프레임 수를 세는 곳 (디버그 오버레이의 프리뷰 fps). */
+    private val frameRateMeter: FrameRateMeter,
     private val onSurfaceTextureReady: (SurfaceTexture) -> Unit,
 ) : GLSurfaceView.Renderer {
 
@@ -79,6 +81,7 @@ class GLRenderer(
         texture.updateTexImage()
         texture.getTransformMatrix(texMatrix)
         if (bufferWidth == 0 || bufferHeight == 0) return
+        frameRateMeter.onFrame(System.nanoTime())
 
         GLES30.glViewport(0, 0, viewWidth, viewHeight)
         shader.draw(

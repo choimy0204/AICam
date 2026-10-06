@@ -20,6 +20,7 @@ import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import com.aiguidecamera.render.FrameRateMeter
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -66,10 +67,11 @@ class CameraController(context: Context) {
     /** 분석기와 ML Kit 완료 콜백이 함께 쓰는 단일 스레드. */
     val analysisExecutor: ExecutorService = Executors.newSingleThreadExecutor()
 
+    /** 메인 스레드에서만 접근. 마지막으로 바인딩한 렌즈. */
     private var lensFacing = CameraSelector.LENS_FACING_BACK
 
-    /** 전면 카메라면 프리뷰가 거울처럼 보인다(디버그 오버레이 좌표 반전용). */
-    val isFrontCamera: Boolean get() = lensFacing == CameraSelector.LENS_FACING_FRONT
+    /** 프리뷰 렌더러가 그린 프레임 수로 fps를 잰다 (성능 점검용). */
+    val previewFrameRate = FrameRateMeter()
 
     /** 메인 스레드에서만 접근. 지금 GL 렌더러가 그리고 있는 SurfaceTexture. */
     private var currentSurfaceTexture: SurfaceTexture? = null
@@ -77,12 +79,16 @@ class CameraController(context: Context) {
     /** 프리뷰 버퍼 크기·회전이 정해지면 호출된다 (width, height, rotationDegrees, mirror). */
     var previewGeometryListener: ((Int, Int, Int, Boolean) -> Unit)? = null
 
-    suspend fun bind(lifecycleOwner: LifecycleOwner) {
+    /** 카메라를 열지 못하면(없음·다른 앱이 사용 중 등) 예외를 던진다. */
+    suspend fun bind(lifecycleOwner: LifecycleOwner, useFrontCamera: Boolean) {
         val provider = awaitCameraProvider()
+        lensFacing = if (useFrontCamera) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK
         val selector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
         provider.unbindAll()
         provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture, imageAnalysis)
     }
+
+    suspend fun hasFrontCamera(): Boolean = awaitCameraProvider().hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)
 
     fun setAnalyzer(analyzer: ImageAnalysis.Analyzer) {
         imageAnalysis.setAnalyzer(analysisExecutor, analyzer)

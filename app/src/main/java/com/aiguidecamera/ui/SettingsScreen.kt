@@ -11,6 +11,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -20,11 +21,13 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aiguidecamera.AIGuideCameraApp
 
-/** 설정 화면. 지금은 "원본도 함께 저장" 하나 (Phase 6에서 항목 추가). */
+/** 설정 화면: "원본도 함께 저장" 스위치와 앱 버전. */
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
-    val settings = (LocalContext.current.applicationContext as AIGuideCameraApp).settings
+    val context = LocalContext.current
+    val settings = (context.applicationContext as AIGuideCameraApp).settings
     val saveOriginalToo by settings.saveOriginalToo.collectAsStateWithLifecycle()
+    val versionName = remember { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }
 
     Column(
         modifier = Modifier
@@ -38,6 +41,12 @@ fun SettingsScreen(onBack: () -> Unit) {
             description = "켜면 필터 없는 원본도 같은 폴더에 저장돼요. 원본이 있어야 나중에 필터를 바꿀 수 있어요.",
             checked = saveOriginalToo,
             onCheckedChange = settings::setSaveOriginalToo,
+        )
+        Text(
+            text = "버전 $versionName",
+            color = Color.Gray,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp),
         )
     }
 }

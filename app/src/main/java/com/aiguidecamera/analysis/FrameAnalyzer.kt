@@ -1,5 +1,6 @@
 package com.aiguidecamera.analysis
 
+import android.media.Image
 import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.OptIn
@@ -27,6 +28,9 @@ class FrameAnalyzer(
 
     @Volatile var mode: ShootingMode = ShootingMode.PORTRAIT
 
+    /** 전면 카메라는 화면 쪽을 보므로 기기 피치와 카메라 피치의 부호가 반대다. */
+    @Volatile var isFrontCamera: Boolean = false
+
     private val poseAnalyzer = PoseAnalyzer()
     private val faceAnalyzer = FaceAnalyzer()
     private val lightAnalyzer = LightAnalyzer()
@@ -44,6 +48,16 @@ class FrameAnalyzer(
         }
         lastAnalysisMs = now
 
+        // 어떤 이유로든 분석을 시작하지 못하면 프레임을 닫아야 다음 프레임이 들어온다.
+        try {
+            startAnalysis(image, mediaImage, now)
+        } catch (error: Exception) {
+            Log.w(TAG, "분석 시작 실패", error)
+            image.close()
+        }
+    }
+
+    private fun startAnalysis(image: ImageProxy, mediaImage: Image, now: Long) {
         val rotation = image.imageInfo.rotationDegrees
         val isSideways = rotation == 90 || rotation == 270
         val uprightWidth = if (isSideways) image.height else image.width
@@ -82,11 +96,15 @@ class FrameAnalyzer(
     ) {
         try {
             lightAnalyzer.analyze(image, rotation, faces.firstOrNull()?.box)
+        } catch (error: Exception) {
+            Log.w(TAG, "밝기 분석 실패, 이번 프레임은 건너뜁니다", error)
+            return
         } finally {
             image.close()
         }
         val motion = poseMotion(previousLandmarks, landmarks)
         previousLandmarks = landmarks
+        val sensorPitch = sensorReader.pitchDeg
         onResult(
             FrameAnalysisResult(
                 timestampMs = timestampMs,
@@ -99,9 +117,10 @@ class FrameAnalyzer(
                 meanBlue = lightAnalyzer.meanBlue,
                 rollDeg = sensorReader.rollDeg,
                 deviceRollDeg = sensorReader.deviceRollDeg,
-                pitchDeg = sensorReader.pitchDeg,
+                pitchDeg = if (isFrontCamera) -sensorPitch else sensorPitch,
                 gyroMagnitude = sensorReader.consumeGyroPeak(),
                 poseMotion = motion,
+                analysisLatencyMs = SystemClock.elapsedRealtime() - timestampMs,
             ),
         )
     }

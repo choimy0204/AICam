@@ -16,18 +16,21 @@ import com.aiguidecamera.AIGuideCameraApp
 import com.aiguidecamera.camera.CameraController
 import com.aiguidecamera.render.FilterParams
 import com.aiguidecamera.render.GLRenderer
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.StateFlow
 
 /**
  * GLSurfaceView를 Compose에 임베드하고 CameraController와 GLRenderer를 잇는다.
  * 화면 수명주기(onResume/onPause)를 GLSurfaceView에 전달하고, 카메라를 같은 수명주기에 바인딩한다.
- * [filterParams]가 바뀌면 즉시 프리뷰 셰이더에 반영한다.
+ * [filterParams]가 바뀌면 즉시 프리뷰 셰이더에 반영하고, [isFrontCamera]가 바뀌면 카메라를 다시 바인딩한다.
  */
 @Composable
 fun CameraPreview(
     controller: CameraController,
     filterParams: FilterParams,
     faceBoxes: StateFlow<List<RectF>>,
+    isFrontCamera: Boolean,
+    onCameraError: (Exception) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -36,7 +39,7 @@ fun CameraPreview(
     val glView = remember { GLSurfaceView(context) }
     val renderer = remember {
         val lutLoader = (context.applicationContext as AIGuideCameraApp).lutLoader
-        GLRenderer(glView, lutLoader) { surfaceTexture -> controller.attachPreviewSurface(surfaceTexture) }.also {
+        GLRenderer(glView, lutLoader, controller.previewFrameRate) { surfaceTexture -> controller.attachPreviewSurface(surfaceTexture) }.also {
             glView.setEGLContextClientVersion(GLES_VERSION)
             glView.preserveEGLContextOnPause = true
             glView.setRenderer(it)
@@ -69,8 +72,14 @@ fun CameraPreview(
         faceBoxes.collect { renderer.setFaceBoxes(it) }
     }
 
-    LaunchedEffect(lifecycleOwner) {
-        controller.bind(lifecycleOwner)
+    LaunchedEffect(lifecycleOwner, isFrontCamera) {
+        try {
+            controller.bind(lifecycleOwner, isFrontCamera)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            onCameraError(error)
+        }
     }
 
     AndroidView(factory = { glView }, modifier = modifier)

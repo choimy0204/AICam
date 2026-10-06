@@ -23,12 +23,14 @@ data class FrameAnalysisResult(
     val rollDeg: Float,
     /** 정규화 전 기기 롤(-180~180). 화면(세로 고정)에 실제 수평선을 그릴 때 쓴다. */
     val deviceRollDeg: Float,
-    /** 후면 카메라가 수평선 아래를 향하는 각도. 0 = 정면, 90 = 바로 아래(탑뷰), 음수 = 위를 봄. */
+    /** 지금 쓰는 카메라(전면/후면)가 수평선 아래를 향하는 각도. 0 = 정면, 90 = 바로 아래(탑뷰), 음수 = 위를 봄. */
     val pitchDeg: Float,
     /** 직전 분석 이후 자이로 각속도 크기의 최댓값 (rad/s). */
     val gyroMagnitude: Float,
     /** 직전 프레임 대비 포즈 랜드마크 평균 이동량 (화면 비율). 비교할 수 없으면 null. */
     val poseMotion: Float?,
+    /** 프레임을 받은 뒤 결과가 나올 때까지 걸린 시간 (성능 점검용). */
+    val analysisLatencyMs: Long = 0L,
 ) {
     val primaryFace: FaceInfo? get() = faces.firstOrNull()
 }

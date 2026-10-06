@@ -1,9 +1,14 @@
 package com.aiguidecamera
 
 import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -20,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,7 +36,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -107,20 +117,39 @@ private object Routes {
     fun edit(id: Long) = "edit/$id"
 }
 
-/** 카메라(+ API 28 이하 저장소) 권한이 모두 있을 때만 [content]를 보여준다. */
+/**
+ * 카메라(+ API 28 이하 저장소) 권한이 모두 있을 때만 [content]를 보여준다.
+ * "다시 묻지 않음"으로 거절됐으면 앱 설정 화면으로 안내하고, 설정에서 돌아오면(ON_RESUME) 다시 확인한다.
+ */
 @Composable
 private fun PermissionGate(content: @Composable () -> Unit) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val required = remember { requiredPermissions() }
-    var granted by remember {
-        mutableStateOf(required.all { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED })
-    }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-        granted = required.all { result[it] == true }
+    fun allGranted() = required.all { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
+
+    var granted by remember { mutableStateOf(allGranted()) }
+    var permanentlyDenied by remember { mutableStateOf(false) }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        granted = allGranted()
+        val activity = context as? Activity
+        // 거절 직후 rationale을 보여줄 수 없다면 시스템이 더 이상 묻지 않는 상태다.
+        permanentlyDenied = !granted && activity != null && required.any {
+            ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED &&
+                !ActivityCompat.shouldShowRequestPermissionRationale(activity, it)
+        }
     }
 
     LaunchedEffect(Unit) {
         if (!granted) launcher.launch(required)
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) granted = allGranted()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     if (granted) {
@@ -136,11 +165,24 @@ private fun PermissionGate(content: @Composable () -> Unit) {
         ) {
             Text("사진을 찍으려면 카메라 권한이 필요해요", color = Color.White)
             Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = { launcher.launch(required) }) {
-                Text("권한 허용하기")
+            if (permanentlyDenied) {
+                Text("설정 > 권한에서 카메라를 허용해 주세요", color = Color.LightGray)
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(onClick = { openAppSettings(context) }) {
+                    Text("앱 설정 열기")
+                }
+            } else {
+                Button(onClick = { launcher.launch(required) }) {
+                    Text("권한 허용하기")
+                }
             }
         }
     }
+}
+
+private fun openAppSettings(context: Context) {
+    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+    context.startActivity(intent)
 }
 
 private fun requiredPermissions(): Array<String> =
