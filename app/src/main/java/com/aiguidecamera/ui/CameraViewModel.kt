@@ -51,9 +51,6 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     private val _thumbnails = MutableStateFlow<Map<String, Bitmap>>(emptyMap())
     val thumbnails: StateFlow<Map<String, Bitmap>> = _thumbnails.asStateFlow()
 
-    /** "원본도 함께 저장" 설정. 설정 화면은 Phase 6에서 연결한다. */
-    private val saveOriginalToo = false
-
     init {
         viewModelScope.launch {
             try {
@@ -126,7 +123,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
             val saver = app.photoSaver
             val baseName = saver.baseNameFor(createdAt)
             val filteredUri = saver.saveJpeg(filtered, saver.filteredFileName(baseName))
-            val originalUri = if (saveOriginalToo) {
+            val originalUri = if (app.settings.saveOriginalToo.value) {
                 saver.saveJpeg(original, saver.originalFileName(baseName))
             } else {
                 null

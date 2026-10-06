@@ -31,9 +31,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.aiguidecamera.ui.CameraScreen
+import com.aiguidecamera.ui.FilterEditScreen
+import com.aiguidecamera.ui.FilterEditViewModel
+import com.aiguidecamera.ui.GalleryScreen
+import com.aiguidecamera.ui.PhotoDetailScreen
+import com.aiguidecamera.ui.SettingsScreen
 
-/** 앱 진입점. 권한을 확인한 뒤 카메라 화면을 띄운다. */
+/** 앱 진입점. 권한을 확인한 뒤 화면 이동(카메라 → 갤러리 → 상세 → 필터 편집, 설정)을 구성한다. */
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,11 +51,60 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 PermissionGate {
-                    CameraScreen(onThumbnailClick = {})
+                    AppNavHost()
                 }
             }
         }
     }
+}
+
+@Composable
+private fun AppNavHost() {
+    val navController = rememberNavController()
+    val photoIdArgument = listOf(navArgument(FilterEditViewModel.ARG_PHOTO_ID) { type = NavType.LongType })
+
+    NavHost(navController = navController, startDestination = Routes.CAMERA) {
+        composable(Routes.CAMERA) {
+            CameraScreen(
+                onThumbnailClick = { navController.navigate(Routes.GALLERY) },
+                onSettingsClick = { navController.navigate(Routes.SETTINGS) },
+            )
+        }
+        composable(Routes.GALLERY) {
+            GalleryScreen(
+                onBack = { navController.popBackStack() },
+                onPhotoClick = { id -> navController.navigate(Routes.detail(id)) },
+            )
+        }
+        composable(Routes.DETAIL, arguments = photoIdArgument) { entry ->
+            PhotoDetailScreen(
+                photoId = entry.arguments?.getLong(FilterEditViewModel.ARG_PHOTO_ID) ?: 0L,
+                onBack = { navController.popBackStack() },
+                onEditClick = { id -> navController.navigate(Routes.edit(id)) },
+            )
+        }
+        composable(Routes.EDIT, arguments = photoIdArgument) {
+            FilterEditScreen(
+                onBack = { navController.popBackStack() },
+                // 새 사진이 갤러리 맨 앞에 생기므로 편집·상세를 닫고 갤러리로 돌아간다.
+                onSaved = { navController.popBackStack(Routes.GALLERY, inclusive = false) },
+            )
+        }
+        composable(Routes.SETTINGS) {
+            SettingsScreen(onBack = { navController.popBackStack() })
+        }
+    }
+}
+
+private object Routes {
+    const val CAMERA = "camera"
+    const val GALLERY = "gallery"
+    const val DETAIL = "detail/{${FilterEditViewModel.ARG_PHOTO_ID}}"
+    const val EDIT = "edit/{${FilterEditViewModel.ARG_PHOTO_ID}}"
+    const val SETTINGS = "settings"
+
+    fun detail(id: Long) = "detail/$id"
+    fun edit(id: Long) = "edit/$id"
 }
 
 /** 카메라(+ API 28 이하 저장소) 권한이 모두 있을 때만 [content]를 보여준다. */

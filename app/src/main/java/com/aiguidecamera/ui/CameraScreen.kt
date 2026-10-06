@@ -20,6 +20,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +50,7 @@ import com.aiguidecamera.guide.ShootingMode
 @Composable
 fun CameraScreen(
     onThumbnailClick: () -> Unit,
+    onSettingsClick: () -> Unit,
     viewModel: CameraViewModel = viewModel(),
 ) {
     val context = LocalContext.current
@@ -127,7 +132,11 @@ fun CameraScreen(
         ) {
             LatestThumbnail(uri = latestPhoto?.filteredUri, onClick = onThumbnailClick)
             ShutterButton(enabled = !isCapturing, onClick = viewModel::onShutterClick)
-            Spacer(modifier = Modifier.size(THUMBNAIL_SIZE))
+            Box(modifier = Modifier.size(THUMBNAIL_SIZE), contentAlignment = Alignment.Center) {
+                IconButton(onClick = onSettingsClick) {
+                    Icon(Icons.Filled.Settings, contentDescription = "설정", tint = Color.White)
+                }
+            }
         }
     }
 }
