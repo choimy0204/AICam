@@ -49,12 +49,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.aiguidecamera.analysis.SensorReader
 import com.aiguidecamera.camera.CameraController
+import com.aiguidecamera.capture.AutoCaptureState
+import com.aiguidecamera.capture.Readiness
 import com.aiguidecamera.guide.Advice
 import com.aiguidecamera.guide.ShootingMode
 import com.aiguidecamera.guide.rules.HorizonRule
 
 /**
- * 카메라 메인 화면: 상단 모드 토글, 4:3 프리뷰(+필터 조절 패널), 필터 피커, 셔터 버튼, 좌하단 최근 사진 썸네일.
+ * 카메라 메인 화면: 상단 모드 토글, 자동 촬영(AUTO) 토글, 4:3 프리뷰(+필터 조절 패널), 필터 피커, 셔터 버튼, 좌하단 최근 사진 썸네일.
  */
 @Composable
 fun CameraScreen(
@@ -71,6 +73,10 @@ fun CameraScreen(
     val thumbnails by viewModel.thumbnails.collectAsStateWithLifecycle()
     val advice by viewModel.advice.collectAsStateWithLifecycle()
     val foodAngle by viewModel.foodAngle.collectAsStateWithLifecycle()
+    val autoCaptureEnabled by viewModel.autoCaptureEnabled.collectAsStateWithLifecycle()
+    val autoCaptureState by viewModel.autoCaptureState.collectAsStateWithLifecycle()
+    val readiness by viewModel.readiness.collectAsStateWithLifecycle()
+    val autoCaptureMessage = if (autoCaptureEnabled) autoCaptureMessage(autoCaptureState, readiness) else null
     val isHorizonIssue = (advice as? Advice.Problem)?.issue?.ruleId == HorizonRule.ID
     var showAdjustPanel by remember { mutableStateOf(false) }
     var showDebug by rememberSaveable { mutableStateOf(false) }
@@ -116,17 +122,17 @@ fun CameraScreen(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
-            Text(
+            ToggleChip(
                 text = "DBG",
-                color = if (showDebug) Color.Yellow else Color.White.copy(alpha = 0.6f),
-                fontSize = 12.sp,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(12.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color.Black.copy(alpha = 0.4f))
-                    .clickable { showDebug = !showDebug }
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                checked = showDebug,
+                onClick = { showDebug = !showDebug },
+                modifier = Modifier.align(Alignment.TopStart),
+            )
+            ToggleChip(
+                text = "AUTO",
+                checked = autoCaptureEnabled,
+                onClick = viewModel::onAutoCaptureToggle,
+                modifier = Modifier.align(Alignment.TopEnd),
             )
             Column(
                 modifier = Modifier
@@ -149,7 +155,11 @@ fun CameraScreen(
                     .fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                AdviceBanner(advice = advice, modifier = Modifier.padding(bottom = 12.dp))
+                AdviceBanner(
+                    advice = advice,
+                    autoCaptureMessage = autoCaptureMessage,
+                    modifier = Modifier.padding(bottom = 12.dp),
+                )
                 if (showAdjustPanel) {
                     Column(
                         modifier = Modifier
@@ -195,6 +205,30 @@ fun CameraScreen(
             }
         }
     }
+}
+
+/** 프리뷰 모서리의 작은 켜기/끄기 글자 버튼 (DBG, AUTO). 켜지면 노란색. */
+@Composable
+private fun ToggleChip(text: String, checked: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        color = if (checked) Color.Yellow else Color.White.copy(alpha = 0.6f),
+        fontSize = 12.sp,
+        modifier = modifier
+            .padding(12.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color.Black.copy(alpha = 0.4f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+    )
+}
+
+/** 자동 촬영이 켜져 있고 구도가 맞았을 때 배너에 띄울 문구. null이면 기본 "좋아요" 문구. */
+private fun autoCaptureMessage(state: AutoCaptureState, readiness: Readiness): String? = when (state) {
+    AutoCaptureState.AIMING -> readiness.waitingMessage
+    AutoCaptureState.STABILIZING -> "그대로 멈춰 주세요…"
+    AutoCaptureState.CAPTURING -> "촬영 중…"
+    AutoCaptureState.COOLDOWN -> "찍었어요! 구도를 바꾸면 다시 찍어요"
 }
 
 @Composable

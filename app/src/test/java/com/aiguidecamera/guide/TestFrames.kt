@@ -21,8 +21,9 @@ object TestFrames {
         pitch: Float = 0f,
         gyro: Float = 0f,
         motion: Float? = null,
+        time: Long = 0L,
     ) = FrameAnalysisResult(
-        timestampMs = 0L,
+        timestampMs = time,
         landmarks = landmarks,
         faces = faces,
         faceBrightness = faceBrightness,
@@ -66,10 +67,18 @@ object TestFrames {
 
     fun hidden(x: Float, y: Float) = Landmark(x, y, confidence = 0.1f)
 
-    fun face(top: Float, bottom: Float, left: Float = 0.45f, right: Float = 0.55f) = FaceInfo(
+    fun face(
+        top: Float,
+        bottom: Float,
+        left: Float = 0.45f,
+        right: Float = 0.55f,
+        leftEye: Float? = 0.9f,
+        rightEye: Float? = 0.9f,
+        yaw: Float = 0f,
+    ) = FaceInfo(
         box = NormRect(left, top, right, bottom),
-        leftEyeOpenProbability = 0.9f,
-        rightEyeOpenProbability = 0.9f,
-        headEulerY = 0f,
+        leftEyeOpenProbability = leftEye,
+        rightEyeOpenProbability = rightEye,
+        headEulerY = yaw,
     )
 }

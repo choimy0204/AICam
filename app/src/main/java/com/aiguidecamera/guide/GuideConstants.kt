@@ -55,6 +55,22 @@ object GuideConstants {
     const val ISSUE_CLEAR_FRAMES = 5
     const val BURST_COUNT = 3
 
+    /** 분석 프레임(약 100ms) 사이 관절 평균 이동량이 이보다 작으면 피사체가 멈춘 것으로 본다. 화면 대비 비율. */
+    const val POSE_MOTION_STILL_MAX = 0.01f
+
+    /** 쿨다운 해제: 포즈 중심이 촬영 당시보다 이만큼(화면 대비) 옮겨가면 구도가 바뀐 것으로 본다. */
+    const val COOLDOWN_POSE_SHIFT_MIN = 0.15f
+
+    /** 쿨다운 해제: 피치가 촬영 당시보다 이만큼 바뀌면 구도가 바뀐 것으로 본다. */
+    const val COOLDOWN_PITCH_CHANGE_DEG = 15.0f
+
+    /** 베스트 컷 점수 가중치. 선명도는 연사 중 최댓값 대비 비율(0~1), 눈 뜸은 확률(0~1). */
+    const val BEST_SHOT_SHARPNESS_WEIGHT = 0.5f
+    const val BEST_SHOT_EYE_WEIGHT = 0.5f
+
+    /** 베스트 컷 채점용으로 연사 사진을 줄여 디코딩할 때 긴 변의 최소 크기. */
+    const val BEST_SHOT_ANALYSIS_SIDE_PX = 1280
+
     // ── 분석 파이프라인 ──────────────────────────────────────────────────
     /** 분석 프레임 간 최소 간격 (약 10fps). */
     const val ANALYSIS_INTERVAL_MS = 100L

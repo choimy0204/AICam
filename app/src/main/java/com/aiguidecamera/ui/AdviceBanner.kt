@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.RotateLeft
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.ZoomOutMap
@@ -31,26 +32,38 @@ import androidx.compose.ui.unit.sp
 import com.aiguidecamera.guide.Advice
 import com.aiguidecamera.guide.rules.HintType
 
-/** 프리뷰 하단 조언 배너. 조언 1개 + 방향 화살표, 바뀔 때 페이드. 대기 중(Pending)에는 아무것도 안 그린다. */
+/**
+ * 프리뷰 하단 조언 배너. 조언 1개 + 방향 화살표, 바뀔 때 페이드. 대기 중(Pending)에는 아무것도 안 그린다.
+ * 구도가 맞았을 때 [autoCaptureMessage]가 있으면 "좋아요" 대신 자동 촬영 대기 문구를 보여준다.
+ */
 @Composable
-fun AdviceBanner(advice: Advice, modifier: Modifier = Modifier) {
+fun AdviceBanner(advice: Advice, autoCaptureMessage: String?, modifier: Modifier = Modifier) {
+    val content = bannerContentFor(advice, autoCaptureMessage)
     AnimatedContent(
-        targetState = advice,
+        targetState = content,
         transitionSpec = { fadeIn() togetherWith fadeOut() },
-        contentKey = { it.bannerKey() },
+        contentKey = { it?.text },
         label = "advice",
         modifier = modifier,
     ) { current ->
-        when (current) {
-            Advice.Pending -> Box(modifier = Modifier)
-            Advice.Good -> BannerPill(text = "좋아요! 지금 찍어보세요", icon = Icons.Filled.CheckCircle, tint = GOOD_GREEN)
-            is Advice.Problem -> BannerPill(
-                text = current.issue.message,
-                icon = iconFor(current.issue.hint),
-                tint = Color.White,
-            )
+        if (current == null) {
+            Box(modifier = Modifier)
+        } else {
+            BannerPill(text = current.text, icon = current.icon, tint = current.tint)
         }
     }
+}
+
+private class BannerContent(val text: String, val icon: ImageVector?, val tint: Color)
+
+private fun bannerContentFor(advice: Advice, autoCaptureMessage: String?): BannerContent? = when (advice) {
+    Advice.Pending -> null
+    Advice.Good -> if (autoCaptureMessage != null) {
+        BannerContent(autoCaptureMessage, Icons.Filled.HourglassTop, GOOD_GREEN)
+    } else {
+        BannerContent("좋아요! 지금 찍어보세요", Icons.Filled.CheckCircle, GOOD_GREEN)
+    }
+    is Advice.Problem -> BannerContent(advice.issue.message, iconFor(advice.issue.hint), Color.White)
 }
 
 @Composable
@@ -67,13 +80,6 @@ private fun BannerPill(text: String, icon: ImageVector?, tint: Color) {
         }
         Text(text = text, color = Color.White, fontSize = 15.sp)
     }
-}
-
-/** 같은 문구면 애니메이션 없이 유지한다. */
-private fun Advice.bannerKey(): String = when (this) {
-    Advice.Pending -> "pending"
-    Advice.Good -> "good"
-    is Advice.Problem -> issue.ruleId + issue.message
 }
 
 @Suppress("DEPRECATION") // RotateLeft/RotateRight의 AutoMirrored 버전은 RTL에서 뒤집혀 의미가 바뀐다.

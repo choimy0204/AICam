@@ -10,25 +10,39 @@ import com.aiguidecamera.AIGuideCameraApp
 import com.aiguidecamera.analysis.FrameAnalysisResult
 import com.aiguidecamera.analysis.FrameAnalyzer
 import com.aiguidecamera.analysis.SensorReader
+import com.aiguidecamera.analysis.StillFace
 import com.aiguidecamera.camera.CameraController
+import com.aiguidecamera.camera.CapturedJpeg
+import com.aiguidecamera.camera.JpegDecoder
+import com.aiguidecamera.capture.AutoCaptureState
+import com.aiguidecamera.capture.AutoCaptureStateMachine
+import com.aiguidecamera.capture.BestShotSelector
+import com.aiguidecamera.capture.CaptureReadiness
+import com.aiguidecamera.capture.Readiness
+import com.aiguidecamera.capture.SharpnessMeter
+import com.aiguidecamera.capture.ShotScore
 import com.aiguidecamera.filter.FilterPreset
 import com.aiguidecamera.filter.FilterThumbnailFactory
 import com.aiguidecamera.guide.Advice
 import com.aiguidecamera.guide.FoodAngle
+import com.aiguidecamera.guide.GuideConstants
 import com.aiguidecamera.guide.IssueStabilizer
 import com.aiguidecamera.guide.RuleEngine
 import com.aiguidecamera.guide.ShootingMode
 import com.aiguidecamera.render.FilterParams
 import com.aiguidecamera.storage.PhotoRecord
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.concurrent.RejectedExecutionException
 
 /**
- * 카메라 화면 상태(모드·필터·강도·조언)와 "촬영 → 얼굴 검출 → 오프스크린 렌더 → 저장 → PhotoRecord 기록" 흐름을 관리한다.
+ * 카메라 화면 상태(모드·필터·강도·조언·자동 촬영)와 "촬영 → 얼굴 검출 → 오프스크린 렌더 → 저장 → PhotoRecord 기록" 흐름을 관리한다.
  */
 class CameraViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -77,10 +91,21 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     private val ruleEngine = RuleEngine()
     private val issueStabilizer = IssueStabilizer()
 
+    /** 자동 촬영. 기본값 OFF. 상태 머신은 분석 스레드에서만 쓴다. */
+    private val _autoCaptureEnabled = MutableStateFlow(false)
+    val autoCaptureEnabled: StateFlow<Boolean> = _autoCaptureEnabled.asStateFlow()
+    private val _autoCaptureState = MutableStateFlow(AutoCaptureState.AIMING)
+    val autoCaptureState: StateFlow<AutoCaptureState> = _autoCaptureState.asStateFlow()
+    private val _readiness = MutableStateFlow(Readiness.COMPOSITION_NOT_READY)
+    val readiness: StateFlow<Readiness> = _readiness.asStateFlow()
+    private val autoCapture = AutoCaptureStateMachine()
+
     private val frameAnalyzer = FrameAnalyzer(sensorReader, cameraController.analysisExecutor) { result ->
         _analysis.value = result
         val issues = ruleEngine.evaluate(result, _mode.value, _foodAngle.value)
-        _advice.value = issueStabilizer.update(issues)
+        val advice = issueStabilizer.update(issues)
+        _advice.value = advice
+        if (_autoCaptureEnabled.value) updateAutoCapture(advice, result)
         if (result.faces.isNotEmpty() || _faceBoxes.value.isNotEmpty()) {
             _faceBoxes.value = result.faces.map { RectF(it.box.left, it.box.top, it.box.right, it.box.bottom) }
         }
@@ -111,10 +136,60 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         resetAdvice()
     }
 
-    /** 규칙 묶음이 바뀌었으니 이전 프레임 기록을 버린다. 안정화기는 분석 스레드에서 초기화한다. */
+    fun onAutoCaptureToggle() {
+        _autoCaptureEnabled.value = !_autoCaptureEnabled.value
+        runOnAnalysisThread { resetAutoCapture() }
+    }
+
+    /** 규칙 묶음이 바뀌었으니 이전 프레임 기록을 버린다. 안정화기·상태 머신은 분석 스레드에서 초기화한다. */
     private fun resetAdvice() {
         _advice.value = Advice.Pending
-        cameraController.analysisExecutor.execute { issueStabilizer.reset() }
+        runOnAnalysisThread {
+            issueStabilizer.reset()
+            resetAutoCapture()
+        }
+    }
+
+    /** 분석 스레드 전용. */
+    private fun resetAutoCapture() {
+        autoCapture.reset()
+        _autoCaptureState.value = autoCapture.state
+        _readiness.value = Readiness.COMPOSITION_NOT_READY
+    }
+
+    /** 분석 스레드 전용. 조건이 700ms 유지되면 상태 머신이 촬영을 지시한다. */
+    private fun updateAutoCapture(advice: Advice, result: FrameAnalysisResult) {
+        val readiness = CaptureReadiness.evaluate(advice, result, _mode.value)
+        _readiness.value = readiness
+        val shouldCapture = autoCapture.onFrame(readiness == Readiness.READY, result)
+        _autoCaptureState.value = autoCapture.state
+        if (shouldCapture) viewModelScope.launch { runAutoCapture() }
+    }
+
+    private suspend fun runAutoCapture() {
+        // 수동 촬영이 진행 중이면 이번 기회는 건너뛰고 쿨다운으로 넘긴다.
+        if (_isCapturing.compareAndSet(expect = false, update = true)) {
+            try {
+                burstCaptureAndSave()
+            } catch (error: Exception) {
+                _message.value = "사진을 저장하지 못했어요 (${error.message})"
+            } finally {
+                _isCapturing.value = false
+            }
+        }
+        runOnAnalysisThread {
+            autoCapture.onCaptureFinished()
+            _autoCaptureState.value = autoCapture.state
+        }
+    }
+
+    /** ViewModel 정리 뒤 실행기가 닫혀 있으면 조용히 버린다. */
+    private fun runOnAnalysisThread(block: () -> Unit) {
+        try {
+            cameraController.analysisExecutor.execute(block)
+        } catch (_: RejectedExecutionException) {
+            // 화면이 닫히는 중
+        }
     }
 
     fun onFilterSelect(preset: FilterPreset) {
@@ -131,8 +206,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun onShutterClick() {
-        if (_isCapturing.value) return
-        _isCapturing.value = true
+        if (!_isCapturing.compareAndSet(expect = false, update = true)) return
         viewModelScope.launch {
             try {
                 captureAndSave()
@@ -165,9 +239,56 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         val params = _filterParams.value
         val shotMode = _mode.value
         val original = cameraController.takePicture()
+        val faceBoxes = if (params.skinSmoothLevel > 0f) detectFacesSafely(original) else emptyList()
+        renderAndSave(original, faceBoxes, params, shotMode, createdAt)
+    }
+
+    /**
+     * 셔터음 한 번에 [GuideConstants.BURST_COUNT]장을 연달아 찍고, 선명도 + 눈 뜸 점수로 1장을 골라 저장한다.
+     * 채점은 줄인 사본으로 하고, 고른 한 장만 원본 크기로 디코딩한다.
+     */
+    private suspend fun burstCaptureAndSave() {
+        val createdAt = System.currentTimeMillis()
+        val params = _filterParams.value
+        val shotMode = _mode.value
+        val shots = ArrayList<CapturedJpeg>(GuideConstants.BURST_COUNT)
+        repeat(GuideConstants.BURST_COUNT) { index ->
+            shots += cameraController.takeJpeg(playSound = index == 0)
+        }
+
+        val scores = ArrayList<ShotScore>(shots.size)
+        val faceBoxesPerShot = ArrayList<List<RectF>>(shots.size)
+        for (shot in shots) {
+            val preview = withContext(Dispatchers.Default) {
+                JpegDecoder.decodeUpright(shot, GuideConstants.BEST_SHOT_ANALYSIS_SIDE_PX)
+            }
+            try {
+                val sharpness = withContext(Dispatchers.Default) { SharpnessMeter.measure(preview) }
+                val faces = if (shotMode == ShootingMode.PORTRAIT) detectStillFacesSafely(preview) else emptyList()
+                scores += ShotScore(sharpness, faces.mapNotNull { it.eyesOpen }.minOrNull())
+                faceBoxesPerShot += faces.map { it.box }
+            } finally {
+                preview.recycle()
+            }
+        }
+
+        val best = BestShotSelector.bestIndex(scores)
+        Log.d(TAG, "연사 채점 $scores -> ${best}번")
+        val original = withContext(Dispatchers.Default) { JpegDecoder.decodeUpright(shots[best]) }
+        val faceBoxes = if (params.skinSmoothLevel > 0f) faceBoxesPerShot[best] else emptyList()
+        renderAndSave(original, faceBoxes, params, shotMode, createdAt)
+    }
+
+    /** 원본에 필터를 입혀 저장하고 기록을 남긴다. [original]은 여기서 해제한다. */
+    private suspend fun renderAndSave(
+        original: Bitmap,
+        faceBoxes: List<RectF>,
+        params: FilterParams,
+        shotMode: ShootingMode,
+        createdAt: Long,
+    ) {
         var filtered: Bitmap? = null
         try {
-            val faceBoxes = if (params.skinSmoothLevel > 0f) detectFacesSafely(original) else emptyList()
             filtered = app.offscreenRenderer.render(original, params, faceBoxes)
 
             val saver = app.photoSaver
@@ -197,10 +318,12 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /** 얼굴 검출이 실패해도 사진은 저장되어야 하므로, 실패하면 피부 보정 없이 진행한다. */
-    private suspend fun detectFacesSafely(bitmap: Bitmap): List<RectF> = try {
-        app.stillFaceDetector.detect(bitmap)
+    private suspend fun detectFacesSafely(bitmap: Bitmap): List<RectF> = detectStillFacesSafely(bitmap).map { it.box }
+
+    private suspend fun detectStillFacesSafely(bitmap: Bitmap): List<StillFace> = try {
+        app.stillFaceDetector.detectFaces(bitmap)
     } catch (error: Exception) {
-        Log.w(TAG, "얼굴 검출 실패, 피부 보정 없이 저장합니다", error)
+        Log.w(TAG, "얼굴 검출 실패, 피부 보정·눈 뜸 점수 없이 진행합니다", error)
         emptyList()
     }
 

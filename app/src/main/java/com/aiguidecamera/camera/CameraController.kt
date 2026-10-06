@@ -2,7 +2,7 @@ package com.aiguidecamera.camera
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Matrix
+import android.graphics.ImageFormat
 import android.graphics.SurfaceTexture
 import android.media.MediaActionSound
 import android.util.Size
@@ -106,6 +106,25 @@ class CameraController(context: Context) {
         imageCapture.targetRotation = rotation
     }
 
+    /**
+     * 연사용: 디코딩하지 않은 JPEG를 돌려준다. 여러 장을 빠르게 찍고, 채점 후 고른 한 장만 크게 디코딩한다.
+     * 고해상도 Bitmap 여러 장을 동시에 들고 있지 않기 위해서다.
+     */
+    suspend fun takeJpeg(playSound: Boolean): CapturedJpeg = suspendCancellableCoroutine { continuation ->
+        if (playSound) shutterSound.play(MediaActionSound.SHUTTER_CLICK)
+        imageCapture.takePicture(captureExecutor, object : ImageCapture.OnImageCapturedCallback() {
+            override fun onCaptureSuccess(image: ImageProxy) {
+                val result = runCatching { image.use { toCapturedJpeg(it) } }
+                result.onSuccess { continuation.resume(it) }
+                result.onFailure { continuation.resumeWithException(it) }
+            }
+
+            override fun onError(exception: ImageCaptureException) {
+                continuation.resumeWithException(exception)
+            }
+        })
+    }
+
     /** 셔터음을 내고 한 장 찍어 똑바로 세운 원본 Bitmap을 돌려준다. */
     suspend fun takePicture(): Bitmap = suspendCancellableCoroutine { continuation ->
         shutterSound.play(MediaActionSound.SHUTTER_CLICK)
@@ -152,14 +171,15 @@ class CameraController(context: Context) {
         }
     }
 
-    private fun toUprightBitmap(image: ImageProxy): Bitmap {
-        val decoded = image.toBitmap()
-        val rotation = image.imageInfo.rotationDegrees
-        if (rotation == 0) return decoded
-        val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
-        val rotated = Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
-        decoded.recycle()
-        return rotated
+    private fun toUprightBitmap(image: ImageProxy): Bitmap =
+        JpegDecoder.rotateUpright(image.toBitmap(), image.imageInfo.rotationDegrees)
+
+    private fun toCapturedJpeg(image: ImageProxy): CapturedJpeg {
+        check(image.format == ImageFormat.JPEG) { "JPEG가 아닌 촬영 결과: ${image.format}" }
+        val buffer = image.planes[0].buffer
+        val bytes = ByteArray(buffer.remaining())
+        buffer.get(bytes)
+        return CapturedJpeg(bytes, image.imageInfo.rotationDegrees)
     }
 
     private companion object {
