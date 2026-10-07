@@ -12,8 +12,11 @@ import com.aiguidecamera.guide.rules.HeadroomRule
 import com.aiguidecamera.guide.rules.HighlightClipRule
 import com.aiguidecamera.guide.rules.HorizonRule
 import com.aiguidecamera.guide.rules.Issue
+import com.aiguidecamera.guide.rules.LowLightRule
+import com.aiguidecamera.guide.rules.NightGlareRule
 import com.aiguidecamera.guide.rules.Rule
 import com.aiguidecamera.guide.rules.SkyLinePlacementRule
+import com.aiguidecamera.guide.rules.SteadyHoldRule
 import com.aiguidecamera.guide.rules.SubjectPlacementRule
 import com.aiguidecamera.guide.rules.SubjectPresenceRule
 
@@ -46,6 +49,14 @@ class RuleEngine {
         HighlightClipRule(),
     )
 
+    /** 야경: 흔들림이 가장 치명적이고, 그다음 수평, 불빛 번짐, 빛 부족 순. */
+    private val nightRules: List<Rule> = listOf(
+        SteadyHoldRule(),
+        HorizonRule(priority = 2),
+        NightGlareRule(),
+        LowLightRule(),
+    )
+
     private val issues = ArrayList<Issue>()
 
     fun evaluate(result: FrameAnalysisResult, mode: ShootingMode, foodAngle: FoodAngle): List<Issue> {
@@ -53,6 +64,7 @@ class RuleEngine {
             ShootingMode.PORTRAIT -> portraitRules
             ShootingMode.FOOD -> foodRules.getValue(foodAngle)
             ShootingMode.LANDSCAPE -> landscapeRules
+            ShootingMode.NIGHT -> nightRules
         }
         issues.clear()
         for (rule in rules) {

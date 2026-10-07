@@ -7,7 +7,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
-/** 풍경 모드 프리뷰 위 3분할 격자. 수평선·피사체를 선과 교차점에 맞추는 기준이 된다. */
+/** 풍경·야경 모드 프리뷰 위 3분할 격자. 수평선·피사체를 선과 교차점에 맞추는 기준이 된다. */
 @Composable
 fun ThirdsGrid(modifier: Modifier = Modifier) {
     Canvas(modifier = modifier) {

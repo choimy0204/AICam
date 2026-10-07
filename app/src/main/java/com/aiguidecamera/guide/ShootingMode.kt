@@ -5,4 +5,5 @@ enum class ShootingMode {
     PORTRAIT,
     FOOD,
     LANDSCAPE,
+    NIGHT,
 }

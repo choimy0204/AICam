@@ -23,6 +23,7 @@ object FilterCatalog {
         preset("gold_film",    "골드 필름",   0.20f, 0.07f),
         preset("chrome",       "크롬",        0.20f, 0.05f),
         preset("digicam",      "디카 Y2K",    0.12f, 0.04f),
+        preset("night_cine",   "시네 나이트", 0.15f, 0.05f),
         preset("warm_film",    "따뜻한 필름", 0.25f, 0.06f),
         preset("cool_film",    "차가운 필름", 0.25f, 0.06f),
         preset("pastel",       "파스텔",      0.00f, 0.00f),
@@ -41,6 +42,7 @@ object FilterCatalog {
     private const val PORTRAIT_DEFAULT_ID = "clear_skin"
     private const val FOOD_DEFAULT_ID = "food_warm"
     private const val LANDSCAPE_DEFAULT_ID = "vivid"
+    private const val NIGHT_DEFAULT_ID = "night_cine"
 
     fun byId(id: String): FilterPreset = all.firstOrNull { it.id == id } ?: ORIGINAL
 
@@ -48,6 +50,7 @@ object FilterCatalog {
         ShootingMode.PORTRAIT -> byId(PORTRAIT_DEFAULT_ID)
         ShootingMode.FOOD -> byId(FOOD_DEFAULT_ID)
         ShootingMode.LANDSCAPE -> byId(LANDSCAPE_DEFAULT_ID)
+        ShootingMode.NIGHT -> byId(NIGHT_DEFAULT_ID)
     }
 
     private fun preset(id: String, name: String, vignette: Float, grain: Float) =

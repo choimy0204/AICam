@@ -79,6 +79,19 @@ object GuideConstants {
     /** 날아간 샘플 비율이 이보다 크면 노출 경고. */
     const val HIGHLIGHT_CLIP_RATIO_MAX = 0.15f
 
+    // ── 야경 ─────────────────────────────────────────────────────────────
+    /** 야경은 셔터가 길어 흔들림에 약하므로 자동 촬영 기준(GYRO_STILL_MAX_RAD_S)보다 엄격하게 본다. */
+    const val NIGHT_GYRO_STILL_MAX_RAD_S = 0.03f
+
+    /** 날아간 샘플 비율이 이보다 크면 불빛 번짐 경고. 가로등 몇 개 정도(수 %)는 자연스러워 통과시킨다. */
+    const val NIGHT_HIGHLIGHT_CLIP_RATIO_MAX = 0.08f
+
+    /** 노출을 낮춘 상태의 프레임 평균 밝기가 이보다 낮으면 "담을 빛이 없다"고 본다. */
+    const val NIGHT_FRAME_BRIGHTNESS_MIN = 0.05f
+
+    /** 야경 모드 노출 보정(EV). 살짝 어둡게 찍어야 불빛 디테일과 밤 분위기가 남는다. */
+    const val NIGHT_EXPOSURE_EV = -0.7f
+
     // ── 자동 촬영 공통 ───────────────────────────────────────────────────
     const val EYE_OPEN_PROB_MIN = 0.7f
     const val HEAD_YAW_MAX_DEG = 15.0f

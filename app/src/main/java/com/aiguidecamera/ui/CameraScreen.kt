@@ -149,7 +149,7 @@ fun CameraScreen(
                 onCameraError = viewModel::onCameraError,
                 modifier = Modifier.fillMaxSize(),
             )
-            if (mode == ShootingMode.LANDSCAPE) {
+            if (mode == ShootingMode.LANDSCAPE || mode == ShootingMode.NIGHT) {
                 ThirdsGrid(modifier = Modifier.fillMaxSize())
             }
             if (isHorizonIssue) {

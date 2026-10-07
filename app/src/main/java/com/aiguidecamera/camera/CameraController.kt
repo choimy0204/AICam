@@ -7,6 +7,7 @@ import android.graphics.SurfaceTexture
 import android.media.MediaActionSound
 import android.util.Size
 import android.view.Surface
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
@@ -26,6 +27,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.math.roundToInt
 
 /**
  * CameraX 바인딩과 촬영을 담당한다. 프리뷰는 GLRenderer가 만든 SurfaceTexture로 보내고,
@@ -67,6 +69,12 @@ class CameraController(context: Context) {
     /** 분석기와 ML Kit 완료 콜백이 함께 쓰는 단일 스레드. */
     val analysisExecutor: ExecutorService = Executors.newSingleThreadExecutor()
 
+    /** 메인 스레드에서만 접근. 마지막으로 바인딩한 카메라 (노출 보정용). */
+    private var camera: Camera? = null
+
+    /** 메인 스레드에서만 접근. 카메라를 다시 바인딩해도 유지할 노출 보정값(EV). */
+    private var exposureEv = 0f
+
     /** 메인 스레드에서만 접근. 마지막으로 바인딩한 렌즈. */
     private var lensFacing = CameraSelector.LENS_FACING_BACK
 
@@ -85,7 +93,23 @@ class CameraController(context: Context) {
         lensFacing = if (useFrontCamera) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK
         val selector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
         provider.unbindAll()
-        provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture, imageAnalysis)
+        camera = provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture, imageAnalysis)
+        applyExposure()
+    }
+
+    /** 노출 보정을 [ev]에 가장 가까운 단계로 맞춘다. 지원하지 않는 기기에서는 아무것도 하지 않는다. */
+    fun setExposureEv(ev: Float) {
+        exposureEv = ev
+        applyExposure()
+    }
+
+    private fun applyExposure() {
+        val current = camera ?: return
+        val state = current.cameraInfo.exposureState
+        if (!state.isExposureCompensationSupported) return
+        val range = state.exposureCompensationRange
+        val index = (exposureEv / state.exposureCompensationStep.toFloat()).roundToInt().coerceIn(range.lower, range.upper)
+        current.cameraControl.setExposureCompensationIndex(index)
     }
 
     suspend fun hasFrontCamera(): Boolean = awaitCameraProvider().hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)

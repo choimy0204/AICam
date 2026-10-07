@@ -16,8 +16,8 @@ android {
         minSdk = 26
         targetSdk = 36
         // 諛고룷???뚮쭏???????щ┛?? ?깆? versionName??GitHub 由대━???쒓렇(v1.0 ??? 鍮꾧탳?쒕떎.
-        versionCode = 8
-        versionName = "1.0.7"
+        versionCode = 9
+        versionName = "1.0.8"
 
         // ?ㅼ젣 ?곗? 嫄곗쓽 紐⑤몢 64鍮꾪듃 ARM. ?ㅻⅨ CPU??ML Kit ?ㅼ씠?곕툕 ?쇱씠釉뚮윭由щ? 鍮쇱꽌 APK瑜?以꾩씤??
         ndk {

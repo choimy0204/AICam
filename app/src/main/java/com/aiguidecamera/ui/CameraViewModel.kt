@@ -141,6 +141,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         if (newMode == _mode.value) return
         _mode.value = newMode
         frameAnalyzer.mode = newMode
+        cameraController.setExposureEv(if (newMode == ShootingMode.NIGHT) GuideConstants.NIGHT_EXPOSURE_EV else 0f)
         _filterParams.value = paramsFor(newMode)
         resetAdvice()
     }
