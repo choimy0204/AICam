@@ -16,6 +16,13 @@ object FilterCatalog {
         ORIGINAL,
         //     id              이름          비네팅  그레인
         preset("clear_skin",   "맑은 피부",   0.00f, 0.00f),
+        // 요즘 유행 필터 (docs/DECISIONS.md "유행 필터 추가")
+        preset("milk",         "밀크",        0.00f, 0.00f),
+        preset("butter",       "버터",        0.10f, 0.02f),
+        preset("portra",       "인물 필름",   0.15f, 0.05f),
+        preset("gold_film",    "골드 필름",   0.20f, 0.07f),
+        preset("chrome",       "크롬",        0.20f, 0.05f),
+        preset("digicam",      "디카 Y2K",    0.12f, 0.04f),
         preset("warm_film",    "따뜻한 필름", 0.25f, 0.06f),
         preset("cool_film",    "차가운 필름", 0.25f, 0.06f),
         preset("pastel",       "파스텔",      0.00f, 0.00f),
@@ -24,6 +31,7 @@ object FilterCatalog {
         preset("vivid",        "생기",        0.00f, 0.00f),
         preset("food_warm",    "음식 따뜻함", 0.15f, 0.00f),
         preset("food_crisp",   "음식 선명",   0.00f, 0.00f),
+        preset("food_fresh",   "청량",        0.00f, 0.00f),
         preset("cafe_mood",    "카페 무드",   0.30f, 0.05f),
     )
 
