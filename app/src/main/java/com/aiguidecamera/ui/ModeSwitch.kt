@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aiguidecamera.guide.FoodAngle
 import com.aiguidecamera.guide.ShootingMode
+import com.aiguidecamera.ui.theme.AppColors
 
 /** 화면 상단 인물 / 음식 모드 토글. */
 @Composable
@@ -63,7 +64,7 @@ private fun <T> SegmentedSwitch(
     Row(
         modifier = modifier
             .clip(shape)
-            .background(Color.Black.copy(alpha = 0.45f))
+            .background(AppColors.Scrim)
             .padding(4.dp),
     ) {
         items.forEach { item ->
@@ -71,13 +72,13 @@ private fun <T> SegmentedSwitch(
             Box(
                 modifier = Modifier
                     .clip(shape)
-                    .background(if (isSelected) Color.White else Color.Transparent)
+                    .background(if (isSelected) AppColors.Accent else Color.Transparent)
                     .clickable { onSelect(item) }
                     .padding(horizontal = if (compact) 12.dp else 18.dp, vertical = if (compact) 4.dp else 6.dp),
             ) {
                 Text(
                     text = label(item),
-                    color = if (isSelected) Color.Black else Color.White,
+                    color = if (isSelected) AppColors.OnAccent else Color.White,
                     fontSize = if (compact) 12.sp else 14.sp,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                 )

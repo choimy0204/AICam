@@ -4,9 +4,13 @@ import android.net.Uri
 import android.view.OrientationEventListener
 import android.view.Surface
 import android.widget.Toast
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +25,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
@@ -37,9 +42,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -55,6 +62,7 @@ import com.aiguidecamera.capture.Readiness
 import com.aiguidecamera.guide.Advice
 import com.aiguidecamera.guide.ShootingMode
 import com.aiguidecamera.guide.rules.HorizonRule
+import com.aiguidecamera.ui.theme.AppColors
 
 /**
  * 카메라 메인 화면: 상단 설정 버튼·모드 토글, 자동 촬영(AUTO) 토글, 전면/후면 전환 버튼, 4:3 프리뷰(+필터 조절 패널), 필터 피커, 셔터 버튼, 좌하단 최근 사진 썸네일.
@@ -80,6 +88,10 @@ fun CameraScreen(
     val isFrontCamera by viewModel.isFrontCamera.collectAsStateWithLifecycle()
     val canSwitchCamera by viewModel.canSwitchCamera.collectAsStateWithLifecycle()
     val autoCaptureMessage = if (autoCaptureEnabled) autoCaptureMessage(autoCaptureState, readiness) else null
+    val goodBorderColor by animateColorAsState(
+        targetValue = if (advice == Advice.Good) AppColors.Good else Color.Transparent,
+        label = "goodBorder",
+    )
     val isHorizonIssue = (advice as? Advice.Problem)?.issue?.ruleId == HorizonRule.ID
     var showAdjustPanel by remember { mutableStateOf(false) }
     var showDebug by rememberSaveable { mutableStateOf(false) }
@@ -99,7 +111,20 @@ fun CameraScreen(
             .background(Color.Black)
             .systemBarsPadding(),
     ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = AppColors.Accent, modifier = Modifier.size(18.dp))
+            Text(
+                text = "AI 가이드",
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(start = 6.dp).weight(1f),
+            )
             IconButton(onClick = onSettingsClick) {
                 Icon(Icons.Filled.Settings, contentDescription = "설정", tint = Color.White)
             }
@@ -109,9 +134,11 @@ fun CameraScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(PREVIEW_ASPECT_RATIO)
+                .clip(PREVIEW_SHAPE)
                 .border(
                     width = 3.dp,
-                    color = if (advice == Advice.Good) GOOD_GREEN else Color.Transparent,
+                    color = goodBorderColor,
+                    shape = PREVIEW_SHAPE,
                 ),
         ) {
             CameraPreview(
@@ -175,7 +202,7 @@ fun CameraScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color.Black.copy(alpha = 0.5f))
+                            .background(AppColors.Scrim)
                             .padding(horizontal = 16.dp, vertical = 4.dp),
                     ) {
                         LabeledSlider(label = "필터 강도", value = filterParams.intensity, onValueChange = viewModel::onIntensityChange)
@@ -208,10 +235,14 @@ fun CameraScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             LatestThumbnail(uri = latestPhoto?.filteredUri, onClick = onThumbnailClick)
-            ShutterButton(enabled = !isCapturing, onClick = viewModel::onShutterClick)
+            ShutterButton(enabled = !isCapturing, isGood = advice == Advice.Good, onClick = viewModel::onShutterClick)
             Box(modifier = Modifier.size(THUMBNAIL_SIZE), contentAlignment = Alignment.Center) {
                 if (canSwitchCamera) {
-                    IconButton(onClick = viewModel::onSwitchCamera, enabled = !isCapturing) {
+                    IconButton(
+                        onClick = viewModel::onSwitchCamera,
+                        enabled = !isCapturing,
+                        modifier = Modifier.background(AppColors.SurfaceVariant, CircleShape),
+                    ) {
                         Icon(
                             Icons.Filled.Cameraswitch,
                             contentDescription = if (isFrontCamera) "후면 카메라로 전환" else "전면 카메라로 전환",
@@ -224,19 +255,20 @@ fun CameraScreen(
     }
 }
 
-/** 프리뷰 모서리의 작은 켜기/끄기 글자 버튼 (DBG, AUTO). 켜지면 노란색. */
+/** 프리뷰 모서리의 작은 켜기/끄기 글자 버튼 (DBG, AUTO). 켜지면 앰버 바탕. */
 @Composable
 private fun ToggleChip(text: String, checked: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Text(
         text = text,
-        color = if (checked) Color.Yellow else Color.White.copy(alpha = 0.6f),
+        color = if (checked) AppColors.OnAccent else Color.White.copy(alpha = 0.7f),
         fontSize = 12.sp,
+        fontWeight = FontWeight.Bold,
         modifier = modifier
             .padding(12.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .background(Color.Black.copy(alpha = 0.4f))
+            .clip(RoundedCornerShape(50))
+            .background(if (checked) AppColors.Accent else AppColors.Scrim)
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = 10.dp, vertical = 5.dp),
     )
 }
 
@@ -255,8 +287,8 @@ private fun LatestThumbnail(uri: String?, onClick: () -> Unit) {
         modifier = Modifier
             .size(THUMBNAIL_SIZE)
             .clip(shape)
-            .background(Color.DarkGray)
-            .border(2.dp, Color.White, shape)
+            .background(AppColors.SurfaceVariant)
+            .border(1.5.dp, Color.White.copy(alpha = 0.7f), shape)
             .clickable(enabled = uri != null, onClick = onClick),
     ) {
         if (uri != null) {
@@ -270,16 +302,22 @@ private fun LatestThumbnail(uri: String?, onClick: () -> Unit) {
     }
 }
 
+/** 셔터: 구도가 맞으면 바깥 고리가 초록으로 바뀌고, 누르는 동안 안쪽 원이 살짝 줄어든다. */
 @Composable
-private fun ShutterButton(enabled: Boolean, onClick: () -> Unit) {
+private fun ShutterButton(enabled: Boolean, isGood: Boolean, onClick: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val innerScale by animateFloatAsState(targetValue = if (isPressed) 0.88f else 1f, label = "shutterPress")
+    val ringColor by animateColorAsState(targetValue = if (isGood) AppColors.Good else Color.White, label = "shutterRing")
     Box(
         modifier = Modifier
-            .size(76.dp)
-            .border(4.dp, Color.White, CircleShape)
-            .padding(8.dp)
+            .size(78.dp)
+            .border(4.dp, ringColor, CircleShape)
+            .padding(9.dp)
+            .scale(innerScale)
             .clip(CircleShape)
             .background(if (enabled) Color.White else Color.Gray)
-            .clickable(enabled = enabled, onClick = onClick),
+            .clickable(interactionSource = interactionSource, indication = null, enabled = enabled, onClick = onClick),
     )
 }
 
@@ -328,3 +366,4 @@ private fun SensorLifecycle(sensorReader: SensorReader) {
 /** 프리뷰 영역 가로:세로 = 3:4 (4:3 센서를 세로로 본 비율). */
 private const val PREVIEW_ASPECT_RATIO = 3f / 4f
 private val THUMBNAIL_SIZE = 56.dp
+private val PREVIEW_SHAPE = RoundedCornerShape(20.dp)

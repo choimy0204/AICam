@@ -1,7 +1,10 @@
 <resources>
+    <!-- Android 12+ 시스템 스플래시: 앱 배경색 위에 런처 아이콘 -->
     <style name="Theme.AIGuideCamera" parent="android:Theme.Material.NoActionBar">
         <item name="android:statusBarColor">@color/app_background</item>
         <item name="android:navigationBarColor">@color/app_background</item>
         <item name="android:windowBackground">@color/app_background</item>
+        <item name="android:windowSplashScreenBackground">@color/app_background</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/icon_background</item>
     </style>
 </resources>

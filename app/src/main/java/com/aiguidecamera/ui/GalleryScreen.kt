@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.aiguidecamera.AIGuideCameraApp
 import com.aiguidecamera.storage.PhotoRecord
+import com.aiguidecamera.ui.theme.AppColors
 
 /** 앱 내 갤러리: PhotoRecord 목록을 최신순 3열 그리드로 보여준다. */
 @Composable
@@ -40,13 +41,13 @@ fun GalleryScreen(onBack: () -> Unit, onPhotoClick: (Long) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(AppColors.Background)
             .systemBarsPadding(),
     ) {
         ScreenTopBar(title = "갤러리", onBack = onBack)
         if (photos.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("아직 찍은 사진이 없어요", color = Color.LightGray)
+                Text("아직 찍은 사진이 없어요", color = AppColors.TextSecondary)
             }
         } else {
             LazyVerticalGrid(columns = GridCells.Fixed(GRID_COLUMNS), modifier = Modifier.fillMaxSize()) {
@@ -68,7 +69,7 @@ private fun GalleryCell(photo: PhotoRecord, onClick: () -> Unit) {
             .fillMaxWidth()
             .aspectRatio(1f)
             .padding(1.dp)
-            .background(Color.DarkGray)
+            .background(AppColors.SurfaceVariant)
             .clickable(onClick = onClick),
     )
 }

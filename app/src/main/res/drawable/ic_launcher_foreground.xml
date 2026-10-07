@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 런처 아이콘 전경: 구도 가이드 프레임(모서리) + 앰버 렌즈 + AI 반짝임. 안전 영역(21~87) 안에 그린다. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 가이드 프레임 모서리 -->
+    <path
+        android:pathData="M31,42V36Q31,31 36,31H42M66,31H72Q77,31 77,36V42M77,66V72Q77,77 72,77H66M42,77H36Q31,77 31,72V66"
+        android:strokeWidth="3.5"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <!-- 렌즈 -->
+    <path
+        android:pathData="M41,54a13,13 0,1 0,26 0a13,13 0,1 0,-26 0"
+        android:strokeWidth="4.5"
+        android:strokeColor="#FFFFC94D" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M48.5,54a5.5,5.5 0,1 0,11 0a5.5,5.5 0,1 0,-11 0" />
+    <!-- AI 반짝임 -->
+    <path
+        android:fillColor="#FFFFC94D"
+        android:pathData="M70,33Q71,38 75.5,39Q71,40 70,45Q69,40 64.5,39Q69,38 70,33Z" />
+</vector>

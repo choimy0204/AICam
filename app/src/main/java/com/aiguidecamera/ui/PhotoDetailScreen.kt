@@ -25,6 +25,7 @@ import coil.compose.AsyncImage
 import com.aiguidecamera.AIGuideCameraApp
 import com.aiguidecamera.filter.FilterCatalog
 import com.aiguidecamera.storage.PhotoRecord
+import com.aiguidecamera.ui.theme.AppColors
 
 /** 사진 상세: 크게 보기 + "필터 변경" 버튼. 원본이 저장된 사진만 버튼이 켜진다. */
 @Composable
@@ -37,7 +38,7 @@ fun PhotoDetailScreen(photoId: Long, onBack: () -> Unit, onEditClick: (Long) -> 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(AppColors.Background)
             .systemBarsPadding(),
     ) {
         ScreenTopBar(title = record?.let { FilterCatalog.byId(it.filterId).displayName } ?: "", onBack = onBack)
@@ -74,7 +75,7 @@ fun PhotoDetailScreen(photoId: Long, onBack: () -> Unit, onEditClick: (Long) -> 
             if (record != null && !canEdit) {
                 Text(
                     text = "원본이 저장된 사진만 필터를 바꿀 수 있어요",
-                    color = Color.LightGray,
+                    color = AppColors.TextSecondary,
                     fontSize = 13.sp,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 8.dp),

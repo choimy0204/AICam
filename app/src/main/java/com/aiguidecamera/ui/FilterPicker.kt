@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aiguidecamera.filter.FilterCatalog
 import com.aiguidecamera.filter.FilterPreset
+import com.aiguidecamera.ui.theme.AppColors
 import kotlin.math.roundToInt
 
 /**
@@ -82,8 +83,8 @@ private fun FilterThumbnail(
             modifier = Modifier
                 .size(THUMBNAIL_SIZE)
                 .clip(shape)
-                .background(Color.DarkGray)
-                .border(if (selected) 2.dp else 0.dp, if (selected) Color.White else Color.Transparent, shape),
+                .background(AppColors.SurfaceVariant)
+                .border(if (selected) 2.dp else 0.dp, if (selected) AppColors.Accent else Color.Transparent, shape),
         ) {
             if (thumbnail != null) {
                 Image(
@@ -96,7 +97,7 @@ private fun FilterThumbnail(
         }
         Text(
             text = preset.displayName,
-            color = if (selected) Color.White else Color.LightGray,
+            color = if (selected) AppColors.Accent else AppColors.TextSecondary,
             fontSize = 11.sp,
             textAlign = TextAlign.Center,
             maxLines = 1,
@@ -119,7 +120,7 @@ fun LabeledSlider(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier.weight(1f),
-            colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Color.White),
+            colors = SliderDefaults.colors(thumbColor = AppColors.Accent, activeTrackColor = AppColors.Accent),
         )
         Text(
             text = "${(value * 100).roundToInt()}%",

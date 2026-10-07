@@ -11,8 +11,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aiguidecamera.analysis.FrameAnalysisResult
 import com.aiguidecamera.guide.GuideConstants
-import kotlinx.coroutines.flow.StateFlow
+import com.aiguidecamera.ui.theme.AppColors
 import kotlin.math.abs
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * 화면 중앙 수평선. 실제 수평 방향으로 기울여 그리고, 허용 오차 안이면 초록으로 바뀐다.
@@ -29,7 +30,7 @@ fun HorizonLine(analysis: StateFlow<FrameAnalysisResult?>, modifier: Modifier = 
         // 가로로 잡아도 맞도록 정규화 전 롤을 쓴다.
         rotate(degrees = current.deviceRollDeg) {
             drawLine(
-                color = if (level) GOOD_GREEN else Color.White,
+                color = if (level) AppColors.Good else Color.White,
                 start = Offset(center.x - halfLength, center.y),
                 end = Offset(center.x + halfLength, center.y),
                 strokeWidth = 2.dp.toPx(),

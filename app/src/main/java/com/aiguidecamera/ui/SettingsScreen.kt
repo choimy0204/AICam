@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aiguidecamera.AIGuideCameraApp
+import com.aiguidecamera.ui.theme.AppColors
 import com.aiguidecamera.update.UpdateState
 
 /** 설정 화면: "원본도 함께 저장" 스위치, 앱 버전과 업데이트 확인. */
@@ -36,7 +37,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(AppColors.Background)
             .systemBarsPadding(),
     ) {
         ScreenTopBar(title = "설정", onBack = onBack)
@@ -55,7 +56,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                 Text(text = "버전 $versionName", color = Color.White, fontSize = 16.sp)
                 updateStatusText(updateState)?.let { status ->
-                    Text(text = status, color = Color.LightGray, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
+                    Text(text = status, color = AppColors.TextSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
                 }
             }
             TextButton(
@@ -91,7 +92,7 @@ private fun SettingSwitchRow(
     ) {
         Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
             Text(text = title, color = Color.White, fontSize = 16.sp)
-            Text(text = description, color = Color.LightGray, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
+            Text(text = description, color = AppColors.TextSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }

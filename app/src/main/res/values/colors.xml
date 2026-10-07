@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 시스템 바·스플래시용 색. Compose 쪽 색은 ui/theme/AppColors와 맞춘다. -->
+<resources>
+    <color name="app_background">#FF0C0E14</color>
+    <color name="icon_background">#FF1B2030</color>
+</resources>

@@ -21,9 +21,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -53,6 +51,8 @@ import com.aiguidecamera.ui.GalleryScreen
 import com.aiguidecamera.ui.PhotoDetailScreen
 import com.aiguidecamera.ui.SettingsScreen
 import com.aiguidecamera.ui.UpdateDialog
+import com.aiguidecamera.ui.theme.AIGuideCameraTheme
+import com.aiguidecamera.ui.theme.AppColors
 
 /** 앱 진입점. 권한을 확인한 뒤 화면 이동(카메라 → 갤러리 → 상세 → 필터 편집, 설정)을 구성하고, 시작할 때 업데이트를 확인한다. */
 class MainActivity : ComponentActivity() {
@@ -62,7 +62,7 @@ class MainActivity : ComponentActivity() {
         // 앱을 새로 열 때만 확인한다. 새 버전이 없거나 실패하면 아무것도 띄우지 않는다.
         if (savedInstanceState == null) (application as AIGuideCameraApp).updateManager.checkForUpdate(silent = true)
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
+            AIGuideCameraTheme {
                 PermissionGate {
                     AppNavHost()
                 }
@@ -162,7 +162,7 @@ private fun PermissionGate(content: @Composable () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black)
+                .background(AppColors.Background)
                 .padding(32.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -170,7 +170,7 @@ private fun PermissionGate(content: @Composable () -> Unit) {
             Text("사진을 찍으려면 카메라 권한이 필요해요", color = Color.White)
             Spacer(modifier = Modifier.height(16.dp))
             if (permanentlyDenied) {
-                Text("설정 > 권한에서 카메라를 허용해 주세요", color = Color.LightGray)
+                Text("설정 > 권한에서 카메라를 허용해 주세요", color = AppColors.TextSecondary)
                 Spacer(modifier = Modifier.height(12.dp))
                 Button(onClick = { openAppSettings(context) }) {
                     Text("앱 설정 열기")

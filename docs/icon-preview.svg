@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="432" height="432">
+  <!-- 앱 아이콘 미리보기 (res/drawable/ic_launcher_*.xml 과 같은 모양, 원형 마스크) -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="108" y2="108" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2A3045"/>
+      <stop offset="1" stop-color="#0C0E14"/>
+    </linearGradient>
+    <clipPath id="mask"><circle cx="54" cy="54" r="54"/></clipPath>
+  </defs>
+  <g clip-path="url(#mask)">
+    <rect width="108" height="108" fill="url(#bg)"/>
+    <path d="M31,42V36Q31,31 36,31H42M66,31H72Q77,31 77,36V42M77,66V72Q77,77 72,77H66M42,77H36Q31,77 31,72V66" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="54" cy="54" r="13" fill="none" stroke="#FFC94D" stroke-width="4.5"/>
+    <circle cx="54" cy="54" r="5.5" fill="#FFFFFF"/>
+    <path d="M70,33Q71,38 75.5,39Q71,40 70,45Q69,40 64.5,39Q69,38 70,33Z" fill="#FFC94D"/>
+  </g>
+</svg>

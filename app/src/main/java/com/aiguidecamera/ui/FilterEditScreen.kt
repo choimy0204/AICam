@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.aiguidecamera.ui.theme.AppColors
 
 /** 사후 필터 편집: 원본 미리보기 + 필터 피커 + 강도·피부 보정 슬라이더 + 저장(새 파일). */
 @Composable
@@ -55,7 +56,7 @@ fun FilterEditScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(AppColors.Background)
             .systemBarsPadding(),
     ) {
         ScreenTopBar(title = "필터 변경", onBack = onBack) {
