@@ -21,6 +21,8 @@ object TestFrames {
         pitch: Float = 0f,
         gyro: Float = 0f,
         motion: Float? = null,
+        skyLine: Float? = null,
+        clip: Float = 0f,
         time: Long = 0L,
     ) = FrameAnalysisResult(
         timestampMs = time,
@@ -36,6 +38,8 @@ object TestFrames {
         pitchDeg = pitch,
         gyroMagnitude = gyro,
         poseMotion = motion,
+        skyLineY = skyLine,
+        highlightClipRatio = clip,
     )
 
     /** 구도가 잘 맞은 전신: 정수리 여백 약 0.13, 발목 아래 여백 0.10, 관절이 모두 화면 안쪽. */

@@ -18,7 +18,7 @@ import com.aiguidecamera.guide.FoodAngle
 import com.aiguidecamera.guide.ShootingMode
 import com.aiguidecamera.ui.theme.AppColors
 
-/** 화면 상단 인물 / 음식 모드 토글. */
+/** 화면 상단 인물 / 음식 / 풍경 모드 토글. */
 @Composable
 fun ModeSwitch(
     mode: ShootingMode,
@@ -90,4 +90,5 @@ private fun <T> SegmentedSwitch(
 private fun labelOf(mode: ShootingMode): String = when (mode) {
     ShootingMode.PORTRAIT -> "인물"
     ShootingMode.FOOD -> "음식"
+    ShootingMode.LANDSCAPE -> "풍경"
 }

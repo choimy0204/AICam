@@ -40,12 +40,14 @@ object FilterCatalog {
 
     private const val PORTRAIT_DEFAULT_ID = "clear_skin"
     private const val FOOD_DEFAULT_ID = "food_warm"
+    private const val LANDSCAPE_DEFAULT_ID = "vivid"
 
     fun byId(id: String): FilterPreset = all.firstOrNull { it.id == id } ?: ORIGINAL
 
     fun defaultFor(mode: ShootingMode): FilterPreset = when (mode) {
         ShootingMode.PORTRAIT -> byId(PORTRAIT_DEFAULT_ID)
         ShootingMode.FOOD -> byId(FOOD_DEFAULT_ID)
+        ShootingMode.LANDSCAPE -> byId(LANDSCAPE_DEFAULT_ID)
     }
 
     private fun preset(id: String, name: String, vignette: Float, grain: Float) =

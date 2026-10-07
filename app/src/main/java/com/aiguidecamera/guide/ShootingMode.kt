@@ -4,4 +4,5 @@ package com.aiguidecamera.guide
 enum class ShootingMode {
     PORTRAIT,
     FOOD,
+    LANDSCAPE,
 }

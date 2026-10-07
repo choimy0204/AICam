@@ -9,9 +9,11 @@ import com.aiguidecamera.guide.rules.EyeLineRule
 import com.aiguidecamera.guide.rules.FootMarginRule
 import com.aiguidecamera.guide.rules.FoodAngleRule
 import com.aiguidecamera.guide.rules.HeadroomRule
+import com.aiguidecamera.guide.rules.HighlightClipRule
 import com.aiguidecamera.guide.rules.HorizonRule
 import com.aiguidecamera.guide.rules.Issue
 import com.aiguidecamera.guide.rules.Rule
+import com.aiguidecamera.guide.rules.SkyLinePlacementRule
 import com.aiguidecamera.guide.rules.SubjectPlacementRule
 import com.aiguidecamera.guide.rules.SubjectPresenceRule
 
@@ -37,12 +39,20 @@ class RuleEngine {
         listOf(FoodAngleRule(angle), ColorCastRule(), HorizonRule(priority = 3))
     }
 
+    /** 풍경: 수평이 가장 중요하고, 그다음 수평선 위치, 노출 순. */
+    private val landscapeRules: List<Rule> = listOf(
+        HorizonRule(priority = 1),
+        SkyLinePlacementRule(),
+        HighlightClipRule(),
+    )
+
     private val issues = ArrayList<Issue>()
 
     fun evaluate(result: FrameAnalysisResult, mode: ShootingMode, foodAngle: FoodAngle): List<Issue> {
         val rules = when (mode) {
             ShootingMode.PORTRAIT -> portraitRules
             ShootingMode.FOOD -> foodRules.getValue(foodAngle)
+            ShootingMode.LANDSCAPE -> landscapeRules
         }
         issues.clear()
         for (rule in rules) {

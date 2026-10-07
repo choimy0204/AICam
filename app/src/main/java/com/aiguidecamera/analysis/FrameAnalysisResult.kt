@@ -29,6 +29,10 @@ data class FrameAnalysisResult(
     val gyroMagnitude: Float,
     /** 직전 프레임 대비 포즈 랜드마크 평균 이동량 (화면 비율). 비교할 수 없으면 null. */
     val poseMotion: Float?,
+    /** 하늘과 땅의 경계 높이 (폰을 잡은 방향 기준 0 = 위, 1 = 아래). 뚜렷한 경계가 없으면 null. */
+    val skyLineY: Float? = null,
+    /** 하얗게 날아간(최대 밝기) 샘플 비율 0~1. */
+    val highlightClipRatio: Float = 0f,
     /** 프레임을 받은 뒤 결과가 나올 때까지 걸린 시간 (성능 점검용). */
     val analysisLatencyMs: Long = 0L,
 ) {

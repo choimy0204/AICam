@@ -14,10 +14,11 @@ import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executor
 import kotlin.math.hypot
+import kotlin.math.roundToInt
 
 /**
  * CameraX 분석 프레임을 약 10fps로 받아 포즈·얼굴·밝기·센서 값을 모아 [FrameAnalysisResult] 하나로 만든다.
- * 음식 모드에서는 포즈·얼굴 검출을 건너뛴다. ImageProxy는 모든 작업이 끝난 뒤 닫는다.
+ * 인물 모드가 아니면 포즈·얼굴 검출을 건너뛴다. ImageProxy는 모든 작업이 끝난 뒤 닫는다.
  */
 class FrameAnalyzer(
     private val sensorReader: SensorReader,
@@ -63,7 +64,7 @@ class FrameAnalyzer(
         val uprightWidth = if (isSideways) image.height else image.width
         val uprightHeight = if (isSideways) image.width else image.height
 
-        if (mode == ShootingMode.FOOD) {
+        if (mode != ShootingMode.PORTRAIT) {
             finish(image, rotation, now, emptyMap(), emptyList())
             return
         }
@@ -95,7 +96,7 @@ class FrameAnalyzer(
         faces: List<FaceInfo>,
     ) {
         try {
-            lightAnalyzer.analyze(image, rotation, faces.firstOrNull()?.box)
+            lightAnalyzer.analyze(image, rotation, faces.firstOrNull()?.box, heldQuarterTurns())
         } catch (error: Exception) {
             Log.w(TAG, "밝기 분석 실패, 이번 프레임은 건너뜁니다", error)
             return
@@ -112,6 +113,8 @@ class FrameAnalyzer(
                 faces = faces,
                 faceBrightness = lightAnalyzer.faceBrightness,
                 frameBrightness = lightAnalyzer.frameBrightness,
+                skyLineY = lightAnalyzer.skyLineY,
+                highlightClipRatio = lightAnalyzer.highlightClipRatio,
                 meanRed = lightAnalyzer.meanRed,
                 meanGreen = lightAnalyzer.meanGreen,
                 meanBlue = lightAnalyzer.meanBlue,
@@ -124,6 +127,10 @@ class FrameAnalyzer(
             ),
         )
     }
+
+    /** 기기 롤(반시계 +)을 가장 가까운 90도 단위로 묶어 0~3으로 돌려준다. */
+    private fun heldQuarterTurns(): Int =
+        Math.floorMod((sensorReader.deviceRollDeg / QUARTER_TURN_DEG).roundToInt(), FULL_TURN_QUARTERS)
 
     /** 두 프레임 모두 신뢰도 기준을 넘는 관절들의 평균 이동 거리. 공통 관절이 없으면 null. */
     private fun poseMotion(previous: Map<BodyPart, Landmark>, current: Map<BodyPart, Landmark>): Float? {
@@ -147,5 +154,7 @@ class FrameAnalyzer(
 
     private companion object {
         const val TAG = "FrameAnalyzer"
+        const val QUARTER_TURN_DEG = 90f
+        const val FULL_TURN_QUARTERS = 4
     }
 }

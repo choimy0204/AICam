@@ -149,6 +149,9 @@ fun CameraScreen(
                 onCameraError = viewModel::onCameraError,
                 modifier = Modifier.fillMaxSize(),
             )
+            if (mode == ShootingMode.LANDSCAPE) {
+                ThirdsGrid(modifier = Modifier.fillMaxSize())
+            }
             if (isHorizonIssue) {
                 HorizonLine(analysis = viewModel.analysis, modifier = Modifier.fillMaxSize())
             }

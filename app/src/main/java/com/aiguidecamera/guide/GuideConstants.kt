@@ -60,6 +60,25 @@ object GuideConstants {
     /** 파랑 평균이 이보다 작으면 R/B 비율이 의미 없어 색 판정을 하지 않는다. */
     const val COLOR_CAST_CHANNEL_MIN = 0.02f
 
+    // ── 풍경 ─────────────────────────────────────────────────────────────
+    /** 하늘/땅 경계를 찾을 때 화면을 위→아래로 나누는 띠 개수. */
+    const val SKY_LINE_BAND_COUNT = 24
+
+    /** 맨 위·맨 아래 이 개수의 띠 안쪽 경계는 무시한다 (가장자리의 작은 밝은 조각에 끌려가지 않게). */
+    const val SKY_LINE_EDGE_BANDS = 2
+
+    /** 경계 위 평균 밝기가 아래보다 이만큼(0~1) 이상 밝아야 하늘/땅 경계로 인정한다. */
+    const val SKY_LINE_CONTRAST_MIN = 0.12f
+
+    /** 수평선이 화면 가운데(0.5)에서 이 범위 안이면 "가운데에 걸쳤다"고 본다. 3분할선(0.33/0.67)은 통과. */
+    const val SKY_LINE_CENTER_TOLERANCE = 0.09f
+
+    /** 이 밝기(0~255) 이상인 샘플은 하얗게 날아간 것으로 센다. */
+    const val HIGHLIGHT_CLIP_LUMA = 250
+
+    /** 날아간 샘플 비율이 이보다 크면 노출 경고. */
+    const val HIGHLIGHT_CLIP_RATIO_MAX = 0.15f
+
     // ── 자동 촬영 공통 ───────────────────────────────────────────────────
     const val EYE_OPEN_PROB_MIN = 0.7f
     const val HEAD_YAW_MAX_DEG = 15.0f

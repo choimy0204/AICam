@@ -87,7 +87,8 @@ private fun debugText(result: FrameAnalysisResult, previewFps: Float): String {
             ),
         )
         appendLine("joints %d/%d  motion %s".format(visibleJoints, result.landmarks.size, result.poseMotion?.let { "%.3f".format(it) } ?: "-"))
-        append("faces %d".format(result.faces.size))
+        appendLine("faces %d".format(result.faces.size))
+        append("sky %s  clip %.2f".format(result.skyLineY?.let { "%.2f".format(it) } ?: "-", result.highlightClipRatio))
         if (face != null) {
             append(
                 "  eyes %s/%s  yaw %+.0f°".format(
