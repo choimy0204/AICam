@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aiguidecamera.analysis.FrameAnalysisResult
+import com.aiguidecamera.camera.CameraStatus
 import com.aiguidecamera.guide.GuideConstants
 import com.aiguidecamera.render.FrameRateMeter
 import kotlinx.coroutines.flow.StateFlow
@@ -31,10 +32,12 @@ import kotlinx.coroutines.flow.StateFlow
 fun DebugOverlay(
     analysis: StateFlow<FrameAnalysisResult?>,
     isMirrored: Boolean,
+    cameraStatus: StateFlow<CameraStatus>,
     previewFrameRate: FrameRateMeter,
     modifier: Modifier = Modifier,
 ) {
     val result by analysis.collectAsStateWithLifecycle()
+    val status by cameraStatus.collectAsStateWithLifecycle()
     Box(modifier = modifier) {
         val current = result ?: return@Box
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -59,7 +62,7 @@ fun DebugOverlay(
             }
         }
         Text(
-            text = debugText(current, previewFrameRate.fps),
+            text = debugText(current, status, previewFrameRate.fps),
             color = Color.White,
             fontSize = 11.sp,
             fontFamily = FontFamily.Monospace,
@@ -73,11 +76,12 @@ fun DebugOverlay(
     }
 }
 
-private fun debugText(result: FrameAnalysisResult, previewFps: Float): String {
+private fun debugText(result: FrameAnalysisResult, status: CameraStatus, previewFps: Float): String {
     val face = result.primaryFace
     val visibleJoints = result.landmarks.values.count { it.confidence >= GuideConstants.LANDMARK_CONFIDENCE_MIN }
     return buildString {
         appendLine("preview %.0ffps  analysis %dms".format(previewFps, result.analysisLatencyMs))
+        appendLine("ev %+.2f  ext %s".format(status.exposureEv, status.extensionLabel))
         appendLine("roll %+.1f°  pitch %+.1f°  gyro %.3f".format(result.rollDeg, result.pitchDeg, result.gyroMagnitude))
         appendLine("frame Y %.2f  face Y %s".format(result.frameBrightness, result.faceBrightness?.let { "%.2f".format(it) } ?: "-"))
         appendLine(

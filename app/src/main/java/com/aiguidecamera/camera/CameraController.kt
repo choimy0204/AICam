@@ -9,19 +9,29 @@ import android.util.Size
 import android.view.Surface
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
+import androidx.camera.core.SurfaceOrientedMeteringPointFactory
 import androidx.camera.core.SurfaceRequest
+import androidx.camera.extensions.ExtensionMode
+import androidx.camera.extensions.ExtensionsManager
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import com.aiguidecamera.analysis.NormRect
 import com.aiguidecamera.render.FrameRateMeter
+import com.google.common.util.concurrent.ListenableFuture
+import android.util.Log
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -32,6 +42,7 @@ import kotlin.math.roundToInt
 /**
  * CameraX 바인딩과 촬영을 담당한다. 프리뷰는 GLRenderer가 만든 SurfaceTexture로 보내고,
  * 촬영은 고해상도 원본을 똑바로 세운 Bitmap으로 돌려준다. 프리뷰·촬영 모두 4:3.
+ * 노출 보정, 얼굴 초점·노출 측정, 기기 야간·HDR 모드(지원할 때만)도 여기서 건다.
  */
 class CameraController(context: Context) {
 
@@ -69,8 +80,14 @@ class CameraController(context: Context) {
     /** 분석기와 ML Kit 완료 콜백이 함께 쓰는 단일 스레드. */
     val analysisExecutor: ExecutorService = Executors.newSingleThreadExecutor()
 
-    /** 메인 스레드에서만 접근. 마지막으로 바인딩한 카메라 (노출 보정용). */
-    private var camera: Camera? = null
+    /** 마지막으로 바인딩한 카메라. 메인 스레드에서 쓰고, 얼굴 측정은 분석 스레드에서 읽는다. */
+    @Volatile private var camera: Camera? = null
+
+    /** 메인 스레드에서만 접근. 처음 기기 모드를 요청할 때 만든다. */
+    private var extensionsManager: ExtensionsManager? = null
+
+    private val _status = MutableStateFlow(CameraStatus())
+    val status: StateFlow<CameraStatus> = _status.asStateFlow()
 
     /** 메인 스레드에서만 접근. 카메라를 다시 바인딩해도 유지할 노출 보정값(EV). */
     private var exposureEv = 0f
@@ -87,19 +104,85 @@ class CameraController(context: Context) {
     /** 프리뷰 버퍼 크기·회전이 정해지면 호출된다 (width, height, rotationDegrees, mirror, 카메라 변환이 텍스처 행렬에 포함됐는지). */
     var previewGeometryListener: ((Int, Int, Int, Boolean, Boolean) -> Unit)? = null
 
-    /** 카메라를 열지 못하면(없음·다른 앱이 사용 중 등) 예외를 던진다. */
-    suspend fun bind(lifecycleOwner: LifecycleOwner, useFrontCamera: Boolean) {
-        val provider = awaitCameraProvider()
+    /**
+     * 카메라를 열지 못하면(없음·다른 앱이 사용 중 등) 예외를 던진다.
+     * [extensionMode](ExtensionMode)는 기기가 지원하고 분석 프레임도 함께 받을 수 있을 때만 쓰고, 아니면 일반 카메라로 연다.
+     */
+    suspend fun bind(lifecycleOwner: LifecycleOwner, useFrontCamera: Boolean, extensionMode: Int = ExtensionMode.NONE) {
+        val provider = ProcessCameraProvider.getInstance(appContext).await()
         lensFacing = if (useFrontCamera) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK
-        val selector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
+        val baseSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
+        val extensionSelector = extensionSelectorOrNull(provider, baseSelector, extensionMode)
         provider.unbindAll()
-        camera = provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture, imageAnalysis)
+        var activeExtension = ExtensionMode.NONE
+        camera = if (extensionSelector != null) {
+            try {
+                provider.bindToLifecycle(lifecycleOwner, extensionSelector, preview, imageCapture, imageAnalysis)
+                    .also { activeExtension = extensionMode }
+            } catch (error: IllegalArgumentException) {
+                Log.w(TAG, "기기 촬영 모드 바인딩 실패, 일반 카메라로 엽니다", error)
+                provider.unbindAll()
+                provider.bindToLifecycle(lifecycleOwner, baseSelector, preview, imageCapture, imageAnalysis)
+            }
+        } else {
+            provider.bindToLifecycle(lifecycleOwner, baseSelector, preview, imageCapture, imageAnalysis)
+        }
+        _status.value = _status.value.copy(extensionMode = activeExtension)
         applyExposure()
+    }
+
+    /** 기기 야간·HDR 모드를 쓸 수 있으면 그 선택자를, 아니면 null. 확인 중 오류도 "지원 안 함"으로 본다. */
+    private suspend fun extensionSelectorOrNull(
+        provider: ProcessCameraProvider,
+        baseSelector: CameraSelector,
+        extensionMode: Int,
+    ): CameraSelector? {
+        if (extensionMode == ExtensionMode.NONE) return null
+        return try {
+            val manager = extensionsManager
+                ?: ExtensionsManager.getInstanceAsync(appContext, provider).await().also { extensionsManager = it }
+            val usable = manager.isExtensionAvailable(baseSelector, extensionMode) &&
+                manager.isImageAnalysisSupported(baseSelector, extensionMode)
+            if (usable) manager.getExtensionEnabledCameraSelector(baseSelector, extensionMode) else null
+        } catch (error: Exception) {
+            Log.w(TAG, "기기 촬영 모드 확인 실패", error)
+            null
+        }
+    }
+
+    /**
+     * 분석 스레드에서 호출 가능. 얼굴([face], 똑바로 선 사진 기준 0~1)에 초점과 노출 측정을 건다.
+     * 얼굴이 사라져 [cancelFaceMetering]을 부를 때까지 유지한다.
+     */
+    fun meterOnFace(face: NormRect) {
+        val current = camera ?: return
+        val rotation = current.cameraInfo.getSensorRotationDegrees(imageAnalysis.targetRotation)
+        val uprightX = (face.left + face.right) / 2f
+        val uprightY = (face.top + face.bottom) / 2f
+        // 분석 버퍼를 rotation만큼 시계 방향으로 돌린 것이 똑바로 선 사진이므로, 거꾸로 돌려 버퍼 좌표로 바꾼다.
+        val (bufferX, bufferY) = when (rotation) {
+            90 -> uprightY to 1f - uprightX
+            180 -> 1f - uprightX to 1f - uprightY
+            270 -> 1f - uprightY to uprightX
+            else -> uprightX to uprightY
+        }
+        val point = SurfaceOrientedMeteringPointFactory(1f, 1f, imageAnalysis)
+            .createPoint(bufferX, bufferY, maxOf(face.width, face.height))
+        val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
+            .disableAutoCancel()
+            .build()
+        current.cameraControl.startFocusAndMetering(action)
+    }
+
+    /** 분석 스레드에서 호출 가능. 얼굴 측정을 풀고 카메라 자동 초점·노출로 돌아간다. */
+    fun cancelFaceMetering() {
+        camera?.cameraControl?.cancelFocusAndMetering()
     }
 
     /** 노출 보정을 [ev]에 가장 가까운 단계로 맞춘다. 지원하지 않는 기기에서는 아무것도 하지 않는다. */
     fun setExposureEv(ev: Float) {
         exposureEv = ev
+        _status.value = _status.value.copy(exposureEv = ev)
         applyExposure()
     }
 
@@ -112,7 +195,7 @@ class CameraController(context: Context) {
         current.cameraControl.setExposureCompensationIndex(index)
     }
 
-    suspend fun hasFrontCamera(): Boolean = awaitCameraProvider().hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)
+    suspend fun hasFrontCamera(): Boolean = ProcessCameraProvider.getInstance(appContext).await().hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)
 
     fun setAnalyzer(analyzer: ImageAnalysis.Analyzer) {
         imageAnalysis.setAnalyzer(analysisExecutor, analyzer)
@@ -171,8 +254,8 @@ class CameraController(context: Context) {
         })
     }
 
-    private suspend fun awaitCameraProvider(): ProcessCameraProvider = suspendCancellableCoroutine { continuation ->
-        val future = ProcessCameraProvider.getInstance(appContext)
+    private suspend fun <T> ListenableFuture<T>.await(): T = suspendCancellableCoroutine { continuation ->
+        val future = this
         future.addListener({
             val result = runCatching { future.get() }
             result.onSuccess { continuation.resume(it) }
@@ -215,6 +298,8 @@ class CameraController(context: Context) {
     }
 
     private companion object {
+        const val TAG = "CameraController"
+
         /** 분석 프레임 목표 크기. 포즈·얼굴 검출에 충분하고 10fps 처리에 부담이 적은 크기. */
         val ANALYSIS_TARGET_SIZE = Size(640, 480)
     }

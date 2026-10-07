@@ -30,6 +30,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val settings = (context.applicationContext as AIGuideCameraApp).settings
     val saveOriginalToo by settings.saveOriginalToo.collectAsStateWithLifecycle()
+    val autoStraighten by settings.autoStraighten.collectAsStateWithLifecycle()
     val versionName = remember { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }
     val updateManager = (context.applicationContext as AIGuideCameraApp).updateManager
     val updateState by updateManager.state.collectAsStateWithLifecycle()
@@ -46,6 +47,12 @@ fun SettingsScreen(onBack: () -> Unit) {
             description = "켜면 필터 없는 원본도 같은 폴더에 저장돼요. 원본이 있어야 나중에 필터를 바꿀 수 있어요.",
             checked = saveOriginalToo,
             onCheckedChange = settings::setSaveOriginalToo,
+        )
+        SettingSwitchRow(
+            title = "수평 자동 보정",
+            description = "풍경·야경 사진이 조금 기울었으면 저장할 때 반듯하게 돌리고 가장자리를 살짝 잘라내요.",
+            checked = autoStraighten,
+            onCheckedChange = settings::setAutoStraighten,
         )
         Row(
             modifier = Modifier

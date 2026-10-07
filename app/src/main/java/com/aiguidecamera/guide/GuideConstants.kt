@@ -92,6 +92,32 @@ object GuideConstants {
     /** 야경 모드 노출 보정(EV). 살짝 어둡게 찍어야 불빛 디테일과 밤 분위기가 남는다. */
     const val NIGHT_EXPOSURE_EV = -0.7f
 
+    // ── 촬영 보정 (카메라 설정·저장 시 보정) ─────────────────────────────
+    /** 인물: 얼굴 중심이 이만큼(화면 비율) 움직여야 초점·노출 측정을 다시 건다. */
+    const val FACE_METERING_MOVE_MIN = 0.08f
+
+    /** 인물: 측정을 다시 거는 최소 간격. 초점이 헤매지 않게 한다. */
+    const val FACE_METERING_MIN_INTERVAL_MS = 500L
+
+    /** 인물: 얼굴이 이 시간 넘게 안 보이면 측정을 풀고 카메라 자동으로 돌아간다. */
+    const val FACE_METERING_LOST_MS = 1000L
+
+    /** 풍경: 날아간 비율이 이보다 크면 노출을 한 단계 내린다 (안내 기준 HIGHLIGHT_CLIP_RATIO_MAX보다 먼저). */
+    const val AUTO_EV_CLIP_HIGH = 0.10f
+
+    /** 풍경: 날아간 비율이 이보다 작으면 노출을 한 단계 올린다 (최대 0). 둘 사이는 그대로 두어 깜빡이지 않게 한다. */
+    const val AUTO_EV_CLIP_LOW = 0.02f
+
+    const val AUTO_EV_STEP = 1f / 3f
+    const val AUTO_EV_MIN = -2f
+
+    /** 노출을 바꾼 뒤 프레임 밝기가 자리 잡을 때까지 기다리는 시간. */
+    const val AUTO_EV_SETTLE_MS = 700L
+
+    /** 수평 자동 보정 범위(도). 이보다 작으면 티가 안 나고, 크면 일부러 기울인 것으로 본다. */
+    const val STRAIGHTEN_MIN_DEG = 0.5f
+    const val STRAIGHTEN_MAX_DEG = 10f
+
     // ── 자동 촬영 공통 ───────────────────────────────────────────────────
     const val EYE_OPEN_PROB_MIN = 0.7f
     const val HEAD_YAW_MAX_DEG = 15.0f

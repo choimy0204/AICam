@@ -22,7 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 /**
  * GLSurfaceView를 Compose에 임베드하고 CameraController와 GLRenderer를 잇는다.
  * 화면 수명주기(onResume/onPause)를 GLSurfaceView에 전달하고, 카메라를 같은 수명주기에 바인딩한다.
- * [filterParams]가 바뀌면 즉시 프리뷰 셰이더에 반영하고, [isFrontCamera]가 바뀌면 카메라를 다시 바인딩한다.
+ * [filterParams]가 바뀌면 즉시 프리뷰 셰이더에 반영하고, [isFrontCamera]·[extensionMode]가 바뀌면 카메라를 다시 바인딩한다.
  */
 @Composable
 fun CameraPreview(
@@ -30,6 +30,8 @@ fun CameraPreview(
     filterParams: FilterParams,
     faceBoxes: StateFlow<List<RectF>>,
     isFrontCamera: Boolean,
+    /** androidx.camera.extensions.ExtensionMode. 바뀌면 다시 바인딩한다. */
+    extensionMode: Int,
     onCameraError: (Exception) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -72,9 +74,9 @@ fun CameraPreview(
         faceBoxes.collect { renderer.setFaceBoxes(it) }
     }
 
-    LaunchedEffect(lifecycleOwner, isFrontCamera) {
+    LaunchedEffect(lifecycleOwner, isFrontCamera, extensionMode) {
         try {
-            controller.bind(lifecycleOwner, isFrontCamera)
+            controller.bind(lifecycleOwner, isFrontCamera, extensionMode)
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {

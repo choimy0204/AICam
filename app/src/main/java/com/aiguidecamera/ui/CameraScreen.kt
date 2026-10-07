@@ -78,6 +78,7 @@ fun CameraScreen(
     val isCapturing by viewModel.isCapturing.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val mode by viewModel.mode.collectAsStateWithLifecycle()
+    val cameraExtension by viewModel.cameraExtension.collectAsStateWithLifecycle()
     val filterParams by viewModel.filterParams.collectAsStateWithLifecycle()
     val thumbnails by viewModel.thumbnails.collectAsStateWithLifecycle()
     val advice by viewModel.advice.collectAsStateWithLifecycle()
@@ -146,6 +147,7 @@ fun CameraScreen(
                 filterParams = filterParams,
                 faceBoxes = viewModel.faceBoxes,
                 isFrontCamera = isFrontCamera,
+                extensionMode = cameraExtension,
                 onCameraError = viewModel::onCameraError,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -159,6 +161,7 @@ fun CameraScreen(
                 DebugOverlay(
                     analysis = viewModel.analysis,
                     isMirrored = isFrontCamera,
+                    cameraStatus = viewModel.cameraController.status,
                     previewFrameRate = viewModel.cameraController.previewFrameRate,
                     modifier = Modifier.fillMaxSize(),
                 )

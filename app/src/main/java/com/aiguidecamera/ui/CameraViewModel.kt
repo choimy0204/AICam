@@ -11,8 +11,13 @@ import com.aiguidecamera.analysis.FrameAnalysisResult
 import com.aiguidecamera.analysis.FrameAnalyzer
 import com.aiguidecamera.analysis.SensorReader
 import com.aiguidecamera.analysis.StillFace
+import androidx.camera.extensions.ExtensionMode
+import com.aiguidecamera.camera.AutoExposureTuner
 import com.aiguidecamera.camera.CameraController
 import com.aiguidecamera.camera.CapturedJpeg
+import com.aiguidecamera.camera.FaceMeteringPolicy
+import com.aiguidecamera.camera.HorizonStraightener
+import com.aiguidecamera.camera.StraightenMath
 import com.aiguidecamera.camera.JpegDecoder
 import com.aiguidecamera.capture.AutoCaptureState
 import com.aiguidecamera.capture.AutoCaptureStateMachine
@@ -42,7 +47,7 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.RejectedExecutionException
 
 /**
- * 카메라 화면 상태(모드·필터·강도·조언·자동 촬영)와 "촬영 → 얼굴 검출 → 오프스크린 렌더 → 저장 → PhotoRecord 기록" 흐름을 관리한다.
+ * 카메라 화면 상태(모드·필터·강도·조언·자동 촬영·촬영 보정)와 "촬영 → 얼굴 검출 → 오프스크린 렌더 → 저장 → PhotoRecord 기록" 흐름을 관리한다.
  */
 class CameraViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -89,6 +94,14 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     private val _canSwitchCamera = MutableStateFlow(false)
     val canSwitchCamera: StateFlow<Boolean> = _canSwitchCamera.asStateFlow()
 
+    /** 모드별 기기 촬영 모드(ExtensionMode). 지원 여부는 CameraController가 확인한다. */
+    private val _cameraExtension = MutableStateFlow(ExtensionMode.NONE)
+    val cameraExtension: StateFlow<Int> = _cameraExtension.asStateFlow()
+
+    /** 인물 얼굴 측정·풍경 자동 노출. 분석 스레드에서만 쓴다. */
+    private val faceMetering = FaceMeteringPolicy()
+    private val exposureTuner = AutoExposureTuner()
+
     private val _foodAngle = MutableStateFlow(FoodAngle.TOP_VIEW)
     val foodAngle: StateFlow<FoodAngle> = _foodAngle.asStateFlow()
 
@@ -113,6 +126,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         val advice = issueStabilizer.update(issues)
         _advice.value = advice
         if (_autoCaptureEnabled.value) updateAutoCapture(advice, result)
+        updateCameraAssist(result)
         if (result.faces.isNotEmpty() || _faceBoxes.value.isNotEmpty()) {
             _faceBoxes.value = result.faces.map { RectF(it.box.left, it.box.top, it.box.right, it.box.bottom) }
         }
@@ -142,6 +156,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         _mode.value = newMode
         frameAnalyzer.mode = newMode
         cameraController.setExposureEv(if (newMode == ShootingMode.NIGHT) GuideConstants.NIGHT_EXPOSURE_EV else 0f)
+        _cameraExtension.value = extensionFor(newMode)
         _filterParams.value = paramsFor(newMode)
         resetAdvice()
     }
@@ -187,7 +202,41 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         runOnAnalysisThread {
             issueStabilizer.reset()
             resetAutoCapture()
+            faceMetering.reset()
+            exposureTuner.reset()
+            cameraController.cancelFaceMetering()
         }
+    }
+
+    /**
+     * 분석 스레드 전용. 인물은 얼굴에 초점·노출을 맞추고, 풍경은 하늘이 날아가지 않게 노출을 조절한다.
+     * 노출은 메인 스레드에서 바꾸며, 그 사이 모드가 바뀌었으면 버린다.
+     */
+    private fun updateCameraAssist(result: FrameAnalysisResult) {
+        when (_mode.value) {
+            ShootingMode.PORTRAIT -> {
+                val face = result.primaryFace?.box
+                when (faceMetering.update(face, result.timestampMs)) {
+                    FaceMeteringPolicy.Action.METER -> if (face != null) cameraController.meterOnFace(face)
+                    FaceMeteringPolicy.Action.CANCEL -> cameraController.cancelFaceMetering()
+                    FaceMeteringPolicy.Action.NONE -> Unit
+                }
+            }
+            ShootingMode.LANDSCAPE -> if (exposureTuner.update(result.highlightClipRatio, result.timestampMs)) {
+                val ev = exposureTuner.ev
+                viewModelScope.launch {
+                    if (_mode.value == ShootingMode.LANDSCAPE) cameraController.setExposureEv(ev)
+                }
+            }
+            else -> Unit
+        }
+    }
+
+    /** 야경은 여러 장을 합쳐 밝히는 기기 야간 모드, 풍경은 역광에 강한 HDR. 기기가 지원할 때만 실제로 켜진다. */
+    private fun extensionFor(mode: ShootingMode): Int = when (mode) {
+        ShootingMode.NIGHT -> ExtensionMode.NIGHT
+        ShootingMode.LANDSCAPE -> ExtensionMode.HDR
+        else -> ExtensionMode.NONE
     }
 
     /** 분석 스레드 전용. */
@@ -278,7 +327,8 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         val createdAt = System.currentTimeMillis()
         val params = _filterParams.value
         val shotMode = _mode.value
-        val original = cameraController.takePicture()
+        val straightenDeg = straightenAngleFor(shotMode)
+        val original = straightenIfNeeded(cameraController.takePicture(), straightenDeg)
         val faceBoxes = if (params.skinSmoothLevel > 0f) detectFacesSafely(original) else emptyList()
         renderAndSave(original, faceBoxes, params, shotMode, createdAt)
     }
@@ -291,8 +341,11 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         val createdAt = System.currentTimeMillis()
         val params = _filterParams.value
         val shotMode = _mode.value
-        val shots = ArrayList<CapturedJpeg>(GuideConstants.BURST_COUNT)
-        repeat(GuideConstants.BURST_COUNT) { index ->
+        val straightenDeg = straightenAngleFor(shotMode)
+        // 기기 야간·HDR 모드는 한 장에 여러 프레임을 합쳐 오래 걸리므로 한 장만 찍는다.
+        val shotCount = if (cameraController.status.value.extensionMode == ExtensionMode.NONE) GuideConstants.BURST_COUNT else 1
+        val shots = ArrayList<CapturedJpeg>(shotCount)
+        repeat(shotCount) { index ->
             shots += cameraController.takeJpeg(playSound = index == 0)
         }
 
@@ -314,9 +367,26 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
 
         val best = BestShotSelector.bestIndex(scores)
         Log.d(TAG, "연사 채점 $scores -> ${best}번")
-        val original = withContext(Dispatchers.Default) { JpegDecoder.decodeUpright(shots[best]) }
+        val original = straightenIfNeeded(withContext(Dispatchers.Default) { JpegDecoder.decodeUpright(shots[best]) }, straightenDeg)
         val faceBoxes = if (params.skinSmoothLevel > 0f) faceBoxesPerShot[best] else emptyList()
         renderAndSave(original, faceBoxes, params, shotMode, createdAt)
+    }
+
+    /**
+     * 찍는 순간 보정할 기울기. 수평이 중요한 풍경·야경의 후면 촬영만 보정한다 (얼굴 박스를 쓰는 인물은 건드리지 않는다).
+     * 보정하지 않으면 null.
+     */
+    private fun straightenAngleFor(mode: ShootingMode): Float? {
+        if (!app.settings.autoStraighten.value || _isFrontCamera.value) return null
+        if (mode != ShootingMode.LANDSCAPE && mode != ShootingMode.NIGHT) return null
+        val roll = _analysis.value?.rollDeg ?: return null
+        return roll.takeIf { StraightenMath.shouldStraighten(it) }
+    }
+
+    /** [rollDeg]가 있으면 돌려서 잘라낸 새 Bitmap을 돌려주고 입력은 해제한다. */
+    private suspend fun straightenIfNeeded(photo: Bitmap, rollDeg: Float?): Bitmap {
+        if (rollDeg == null) return photo
+        return withContext(Dispatchers.Default) { HorizonStraightener.straighten(photo, rollDeg) }
     }
 
     /** 원본에 필터를 입혀 저장하고 기록을 남긴다. [original]은 여기서 해제한다. */
